@@ -41,8 +41,8 @@
 
 // The Guile foreign object types that get created primarily are just
 // boxes that hold C Pointers.  The <GtkWindow> foreign object type
-// has a slot "ptr".  Instances of the <GtkWindow> object type
-// will use the "ptr" slot to hold a C GtkWindow pointer.
+// has a slot "value".  Instances of the <GtkWindow> object type
+// will use the "value" slot to hold a C GtkWindow pointer.
 
 // These Guile types also have a few class-allocated slots, such as
 // "ref", which points to a class-specific ref-function and "unref",
@@ -112,8 +112,8 @@ static SCM make_class_proc;
 static SCM make_instance_proc;
 static SCM make_fundamental_proc;
 static SCM kwd_name;
-static SCM kwd_ptr;
-static SCM sym_ptr;
+static SCM kwd_value;
+static SCM sym_value;
 static SCM sym_ref;
 static SCM sym_unref;
 static SCM sym_size;
@@ -150,7 +150,7 @@ gig_type_transfer_object(GType type, gpointer ptr, GITransfer transfer)
         break;
     }
 
-    return scm_call_3(make_instance_proc, scm_type, kwd_ptr, pointer);
+    return scm_call_3(make_instance_proc, scm_type, kwd_value, pointer);
 }
 
 static SCM gig_fundamental_type;
@@ -160,7 +160,7 @@ gpointer
 gig_type_peek_typed_object(SCM obj, SCM expected_type)
 {
     g_return_val_if_fail(SCM_IS_A_P(obj, expected_type), NULL);
-    return scm_to_pointer(scm_slot_ref(obj, sym_ptr));
+    return scm_to_pointer(scm_slot_ref(obj, sym_value));
 }
 
 gpointer
@@ -226,6 +226,11 @@ gig_type_define(GType gtype, SCM defs)
         g_return_val_if_fail(sparent != NULL, defs);
 
         switch (fundamental) {
+        case G_TYPE_ENUM:
+        case G_TYPE_FLAGS:
+            g_warning("enums not yet handled");
+            return defs;
+
         case G_TYPE_BOXED:
         {
             dsupers = scm_list_1(SCM_PACK_POINTER(sparent));
@@ -644,7 +649,7 @@ scm_allocate_boxed(SCM boxed_type)
     unref = (GigTypeUnrefFunction)scm_to_pointer(scm_class_ref(boxed_type, sym_unref));
     SCM pointer = scm_from_pointer(boxed, unref);
 
-    return scm_call_3(make_instance_proc, boxed_type, kwd_ptr, pointer);
+    return scm_call_3(make_instance_proc, boxed_type, kwd_value, pointer);
 }
 
 void
@@ -674,14 +679,16 @@ gig_init_types_once(void)
 {
     gig_fundamental_type = scm_c_private_ref("gi oop", "<GFundamental>");
     gig_boxed_type = scm_c_private_ref("gi oop", "<GBoxed>");
+    gig_enum_type = scm_c_private_ref("gi oop", "<GEnum>");
+    gig_flags_type = scm_c_private_ref("gi oop", "<GFlags>");
     make_class_proc = scm_c_public_ref("oop goops", "make-class");
     make_instance_proc = scm_c_public_ref("oop goops", "make");
     make_fundamental_proc = scm_c_private_ref("gi oop", "%make-fundamental-class");
 
     kwd_name = scm_from_utf8_keyword("name");
-    kwd_ptr = scm_from_utf8_keyword("ptr");
+    kwd_value = scm_from_utf8_keyword("value");
 
-    sym_ptr = scm_from_utf8_symbol("ptr");
+    sym_value = scm_from_utf8_symbol("value");
     sym_ref = scm_from_utf8_symbol("ref");
     sym_unref = scm_from_utf8_symbol("unref");
     sym_size = scm_from_utf8_symbol("size");
@@ -692,13 +699,22 @@ gig_init_types_once(void)
     gig_type_scm_hash = g_hash_table_new(g_direct_hash, g_direct_equal);
 #endif
 
+#define A(G,S)                                                      \
+    do {                                                            \
+        SCM key = gig_type_associate(G, S);                         \
+        scm_define(key, S);                                         \
+        scm_module_export(scm_current_module(), scm_list_1(key));   \
+    } while (0)
+
     gig_type_define_fundamental(G_TYPE_OBJECT, SCM_EOL,
                                 (GigTypeRefFunction)g_object_ref_sink,
                                 (GigTypeUnrefFunction)g_object_unref);
     gig_type_define_fundamental(G_TYPE_INTERFACE, SCM_EOL, NULL, NULL);
-    gig_type_associate(G_TYPE_BOXED, gig_boxed_type);
-    scm_c_define("<GBoxed>", gig_boxed_type);
-    scm_c_export("<GBoxed>", NULL);
+
+    A(G_TYPE_BOXED, gig_boxed_type);
+    A(G_TYPE_ENUM, gig_enum_type);
+    A(G_TYPE_FLAGS, gig_flags_type);
+
     gig_type_define(GI_TYPE_BASE_INFO, SCM_EOL);
     gig_type_define_fundamental(G_TYPE_PARAM,
                                 scm_list_1(scm_c_public_ref("oop goops",

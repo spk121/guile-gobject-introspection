@@ -27,9 +27,17 @@
   (load-extension "libguile-gi" "gig_init_object"))
 
 (define-class <GFundamental> ()
-  (ptr #:class <scm-slot>
-       #:init-keyword #:ptr
-       #:init-value %null-pointer))
+  (value #:class <scm-slot>
+         #:init-keyword #:value
+         #:init-value %null-pointer))
+
+(define-class <GEnum> (<GFundamental>)
+  (obarray #:allocation #:each-subclass
+           #:init-value '()))
+
+(define-class <GFlags> (<GFundamental>)
+  (obarray #:allocation #:each-subclass
+           #:init-value '()))
 
 (define-class <GBoxed> (<GFundamental>)
   (ref #:allocation #:each-subclass
