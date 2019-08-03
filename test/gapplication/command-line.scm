@@ -13,7 +13,7 @@
  (begin
    (let ((app (make <GApplication>
                 #:application-id "gi.guile.Example"
-                #:flags APPLICATION_HANDLES_COMMAND_LINE))
+                #:flags (make <GApplicationFlags> '(handles-command-line))))
          (success #f))
      (connect app command-line
               (lambda (app command-line)

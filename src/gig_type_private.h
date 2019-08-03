@@ -4,6 +4,7 @@
 #include <glib.h>
 #include <glib-object.h>
 #include <ffi.h>
+#include <libguile.h>
 
 typedef struct _GigBoxedFuncs
 {
@@ -20,5 +21,9 @@ typedef struct _GigBoxedFuncs
 
 GigBoxedFuncs *_boxed_funcs_for_type(GType type);
 void _free_boxed_funcs();
+
+SCM make_class_proc;
+SCM kwd_name;
+SCM sym_obarray;
 
 #endif

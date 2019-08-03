@@ -3,8 +3,11 @@
 
 (typelib-require ("Marshall" "1.0"))
 
+(define (e sym)
+  (make <%MarshallEnum> sym))
+
 (automake-test
- (let ((x (list->int-vector `(,ENUM_VALUE1 ,ENUM_VALUE2 ,ENUM_VALUE3))))
+ (let ((x `(,(e 'value1) ,(e 'value2) ,(e 'value3))))
    (format #t "Input: ~S~%" x)
    (array-enum-in x)
    #t))

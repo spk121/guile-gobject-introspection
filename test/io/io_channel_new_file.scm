@@ -15,13 +15,13 @@
 
 (define (err-text status)
   (cond
-   ((= status IOSTATUS_ERROR)
+   ((= status (enum->number <%GIOStatus> 'error))
     "error")
-   ((= status IOSTATUS_NORMAL)
+   ((= status (enum->number <%GIOStatus> 'normal))
     "normal")
-   ((= status IOSTATUS_EOF)
+   ((= status (enum->number <%GIOStatus> 'eof))
     "eof")
-   ((= status IOSTATUS_AGAIN)
+   ((= status (enum->number <%GIOStatus> 'again))
     "again")))
 
 (automake-test

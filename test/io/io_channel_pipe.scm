@@ -38,7 +38,7 @@
            (read-chars channel buf)
          (write (utf8->string buf)) (newline)
            (write (list status nbytes-read)) (newline)
-           (and (= status IOSTATUS_NORMAL)
+           (and (= status (enum->number <%GIOStatus> 'normal))
                 (string=?
                  (utf8->string (subbytevector buf 0 5))
                  "hello")

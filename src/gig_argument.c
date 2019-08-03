@@ -23,6 +23,7 @@
 #include "gi_type_tag.h"
 #include "gig_callback.h"
 #include "gig_type.h"
+#include "gig_flag.h"
 
 #ifndef FLT_MAX
 #define FLT_MAX 3.402823466e+38F
@@ -633,9 +634,9 @@ scm_to_c_interface(S2C_ARG_DECL)
     GIInfoType referenced_base_type = g_base_info_get_type(referenced_base_info);
 
     if (referenced_base_type == GI_INFO_TYPE_ENUM)
-        arg->v_int = scm_to_int(object);
+        arg->v_int = gig_enum_to_int(object);
     else if (referenced_base_type == GI_INFO_TYPE_FLAGS)
-        arg->v_uint = scm_to_uint(object);
+        arg->v_uint = gig_flags_to_uint(object);
     else if (referenced_base_type == GI_INFO_TYPE_CALLBACK) {
         GICallbackInfo *callback_info = referenced_base_info;
         if (scm_is_true(scm_procedure_p(object))) {
@@ -979,11 +980,8 @@ scm_to_c_native_interface_array(S2C_ARG_DECL)
 #define FUNC_NAME "%object->c-native-interface-array-arg"
     if ((entry->referenced_base_type == GI_INFO_TYPE_ENUM)
         || (entry->referenced_base_type == GI_INFO_TYPE_FLAGS)) {
-        // We haven't bothered to make a special flag or enum
-        // class on the Scheme side of things.  On the scheme
-        // side, enums and flags are just variables holding
-        // integers.
-        scm_to_c_native_immediate_array(S2C_ARGS);
+        g_assert_not_reached();
+        /* scm_to_c_native_immediate_array(S2C_ARGS); */
     }
     else if ((entry->referenced_base_type == GI_INFO_TYPE_STRUCT)
              || (entry->referenced_base_type == GI_INFO_TYPE_UNION)
@@ -1510,18 +1508,9 @@ c_interface_pointer_to_scm(C2S_ARG_DECL)
 
     GIBaseInfo *referenced_base_info = g_type_info_get_interface(entry->type_info);
     GIInfoType referenced_info_type = g_base_info_get_type(referenced_base_info);
-    if (referenced_info_type == GI_INFO_TYPE_ENUM) {
-        TRACE_C2S();
-        g_assert_nonnull(arg->v_pointer);
-        gint val = *(gint *)arg->v_pointer;
-        *object = scm_from_int(val);
-    }
-    else if (referenced_info_type == GI_INFO_TYPE_ENUM) {
-        TRACE_C2S();
-        g_assert_nonnull(arg->v_pointer);
-        guint val = *(guint *)arg->v_pointer;
-        *object = scm_from_uint(val);
-    }
+
+    if (referenced_info_type == GI_INFO_TYPE_ENUM || referenced_info_type == GI_INFO_TYPE_FLAGS)
+        c_interface_to_scm(C2S_ARGS);
     else if (referenced_info_type == GI_INFO_TYPE_CALLBACK) {
         TRACE_C2S();
         g_assert_nonnull(arg->v_pointer);
@@ -1556,8 +1545,10 @@ c_interface_to_scm(C2S_ARG_DECL)
     switch (referenced_info_type)
     {
     case GI_INFO_TYPE_ENUM:
+        *object = gig_int_to_enum_with_info(arg->v_uint32, referenced_base_info);
+        break;
     case GI_INFO_TYPE_FLAGS:
-        *object = scm_from_uint32(arg->v_uint32);
+        *object = gig_uint_to_flags_with_info(arg->v_uint32, referenced_base_info);
         break;
     case GI_INFO_TYPE_CALLBACK:
         *object = scm_from_pointer(arg->v_pointer, NULL);

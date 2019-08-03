@@ -37,7 +37,8 @@
                G_TYPE_ENUM G_TYPE_FLAGS
                G_TYPE_FLOAT G_TYPE_DOUBLE
                G_TYPE_OBJECT
-               <GObject> <GInterface> <GVariant> <GParam> <GBoxed> <GIBaseInfo>)
+               <GObject> <GInterface> <GVariant> <GParam> <GBoxed> <GIBaseInfo>
+               enum->number flags->number)
   #:replace ((%new . make))
   #:export (use-typelibs
             register-type))
@@ -110,6 +111,10 @@
     ((@@ (gi oop) %make-gobject) type rest))
    ((subclass? type <GBoxed>)
     ((@@ (gi types) %allocate-boxed) type))
+   ((subclass? type <GEnum>)
+    (make type #:value (car rest)))
+   ((subclass? type <GFlags>)
+    (make type #:value (car rest)))
    (else
     (apply make type rest))))
 

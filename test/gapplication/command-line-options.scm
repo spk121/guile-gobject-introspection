@@ -1,4 +1,4 @@
-(use-modules (gi) (gi repository)
+(use-modules (gi) (gi repository) (gi types)
              (test automake-test-lib)
              (srfi srfi-43))
 
@@ -16,10 +16,11 @@
  (begin
    (let ((app (make <GApplication>
                 #:application-id "gi.guile.Example"
-                #:flags APPLICATION_HANDLES_COMMAND_LINE))
+                #:flags (make <GApplicationFlags> '(handles-command-line))))
          (success #f))
+     ;; (display (flags->number (flags app)))
      (add-main-option app "hello" (char->integer #\h) 0
-                      OPTION_ARG_STRING_ARRAY "" #f)
+                      (make <%GOptionArg> 'string-array) "" #f)
 
      (connect app command-line
               (lambda (app command-line)

@@ -16,7 +16,7 @@
 #include "gig_value.h"
 #include "gig_type.h"
 #include "gig_object.h"
-#include "gig_type.h"
+#include "gig_flag.h"
 
 #ifndef FLT_MAX
 #define FLT_MAX 3.402823466e+38F
@@ -145,27 +145,18 @@ gig_value_from_scm(GValue *value, SCM obj)
     }
     case G_TYPE_ENUM:
     {
-        if (!scm_is_exact_integer(obj))
+        if (!SCM_IS_A_P(obj, gig_enum_type))
             return GIG_VALUE_WRONG_TYPE;
-        if (!scm_is_unsigned_integer(obj, 0, G_MAXULONG))
-            return GIG_VALUE_OUT_OF_RANGE;
-        gint val;
-        val = scm_to_ulong(obj);
-        g_value_set_enum(value, val);
-    }
-        break;
-    case G_TYPE_FLAGS:
-    {
-        if (!scm_is_exact_integer(obj))
-            return GIG_VALUE_WRONG_TYPE;
-        if (!scm_is_unsigned_integer(obj, 0, G_MAXULONG))
-            return GIG_VALUE_OUT_OF_RANGE;
-        guint val = 0;
-        val = scm_to_ulong(obj);
-        g_value_set_flags(value, val);
+        g_value_set_enum(value, gig_enum_to_int(obj));
         return 0;
     }
-        break;
+    case G_TYPE_FLAGS:
+    {
+        if (!SCM_IS_A_P(obj, gig_flags_type))
+            return GIG_VALUE_WRONG_TYPE;
+        g_value_set_flags(value, gig_flags_to_uint(obj));
+        return 0;
+    }
     case G_TYPE_FLOAT:
     {
         if (!scm_is_true(scm_real_p(obj)))
@@ -325,13 +316,9 @@ gig_value_to_scm_basic_type(const GValue *value, GType fundamental, gboolean *ha
     case G_TYPE_UINT64:
         return scm_from_uint64(g_value_get_uint64(value));
     case G_TYPE_ENUM:
-        /* return gi_genum_from_gtype (G_VALUE_TYPE (value), */
-        /*                             g_value_get_enum (value)); */
-        return scm_from_ulong(g_value_get_enum(value));
+        return gig_int_to_enum(g_value_get_enum(value), G_VALUE_TYPE(value));
     case G_TYPE_FLAGS:
-        /* return gi_gflags_from_gtype (G_VALUE_TYPE (value), */
-        /*                              g_value_get_flags (value)); */
-        return scm_from_ulong(g_value_get_flags(value));
+        return gig_uint_to_flags(g_value_get_flags(value), G_VALUE_TYPE(value));
     case G_TYPE_FLOAT:
         return scm_from_double(g_value_get_float(value));
     case G_TYPE_DOUBLE:

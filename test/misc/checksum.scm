@@ -5,7 +5,7 @@
 (typelib-require ("GLib" "2.0"))
 
 (automake-test
- (let ((cksum (checksum:new CHECKSUM_SHA256))
+ (let ((cksum (checksum:new (make <%GChecksumType> 'sha256)))
        (bv (string->utf8 "ABCDEFGHIJKLMNOPQRSTUVWXYZ\n")))
    (write cksum) (newline)
    (write bv) (newline)

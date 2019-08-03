@@ -23,11 +23,14 @@
 G_BEGIN_DECLS
 // *INDENT-ON*
 
-SCM gig_flag_define(GIEnumInfo *info, SCM defs);
-static inline void
-gig_flag_document(GString **str, GIEnumInfo *info)
-{
-}
+gint gig_enum_to_int(SCM _enum);
+guint gig_flags_to_uint(SCM _flags);
+SCM gig_int_to_enum(gint value, GType type);
+SCM gig_uint_to_flags(guint value, GType type);
+SCM gig_int_to_enum_with_info(gint val, GIEnumInfo *info);
+SCM gig_uint_to_flags_with_info(guint val, GIEnumInfo *info);
+
+SCM gig_define_enum(GIEnumInfo *info, SCM defs);
 
 void gig_init_flag(void);
 

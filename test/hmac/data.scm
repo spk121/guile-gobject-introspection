@@ -8,7 +8,7 @@
  (let* ([bv (string->utf8 "The quick brown fox jumps over the lazy dog")]
         [len (bytevector-length bv)]
         [hmac (compute-hmac-for-data
-               CHECKSUM_MD5
+               (make <%GChecksumType> 'md5)
                (string->utf8 "key")
                bv)])
    (write bv) (newline)

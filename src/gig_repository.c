@@ -175,8 +175,14 @@ load_info(GIBaseInfo *info, LoadFlags flags, SCM defs)
     }
     case GI_INFO_TYPE_ENUM:
     case GI_INFO_TYPE_FLAGS:
-        defs = gig_flag_define(info, defs);
+    {
+        GType gtype = g_registered_type_info_get_g_type(info);
+        if (gtype == G_TYPE_NONE)
+            defs = gig_define_enum(info, defs);
+        else
+            defs = gig_type_define(gtype, defs);
         break;
+    }
     case GI_INFO_TYPE_OBJECT:
     {
         GType gtype = g_registered_type_info_get_g_type(info);

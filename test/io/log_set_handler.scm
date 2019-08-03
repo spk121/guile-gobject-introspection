@@ -20,9 +20,8 @@
 
 (automake-test
  (let ((ID (log-set-handler #f
-                            (logior LOG_LEVEL_LEVEL_WARNING
-                                    LOG_LEVEL_FLAG_FATAL
-                                    LOG_LEVEL_FLAG_RECURSION)
+                            (make <%GLogLevelFlags>
+                              '(level-warning flag-fatal flag-recursion))
                             my-logger
                             #f
                             destroy-notify)))

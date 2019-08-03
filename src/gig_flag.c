@@ -16,98 +16,133 @@
 #include <inttypes.h>
 #include <libguile.h>
 #include "gig_flag.h"
+#include "gig_type.h"
+#include "gig_type_private.h"
+#include "gig_util.h"
 
-static gchar *gname_to_scm_constant_name(const gchar *gname);
+static SCM enum_to_number;
+static SCM flags_to_number;
 
-static gchar *
-gname_to_scm_constant_name(const gchar *gname)
+GHashTable *gig_flag_hash = NULL;
+
+gint
+gig_enum_to_int(SCM val)
 {
-    gsize len = strlen(gname);
-    GString *str = g_string_new(NULL);
-    gboolean was_lower = FALSE;
-
-    for (gsize i = 0; i < len; i++) {
-        if (g_ascii_islower(gname[i])) {
-            g_string_append_c(str, g_ascii_toupper(gname[i]));
-            was_lower = TRUE;
-        }
-        else if (gname[i] == '_' || gname[i] == '-') {
-            g_string_append_c(str, '_');
-            was_lower = FALSE;
-        }
-        else if (g_ascii_isdigit(gname[i])) {
-            g_string_append_c(str, gname[i]);
-            was_lower = FALSE;
-        }
-        else if (g_ascii_isupper(gname[i])) {
-            if (was_lower)
-                g_string_append_c(str, '_');
-            g_string_append_c(str, gname[i]);
-            was_lower = FALSE;
-        }
-    }
-
-    gchar *fptr = strstr(str->str, "_FLAGS");
-    if (fptr) {
-        memcpy(fptr, fptr + 6, str->len - (fptr - str->str) - 6);
-        memset(str->str + str->len - 6, 0, 6);
-        str->len -= 6;
-    }
-
-    return g_string_free(str, FALSE);
+    return scm_to_int(scm_call_1(enum_to_number, val));
 }
 
-static gchar *
-gig_flag_public_name(const gchar *parent, GIBaseInfo *info)
+guint
+gig_flags_to_uint(SCM val)
 {
-    gchar *short_parent, *tmp_str, *public_name;
-
-    // Many flag collection names end in 'Type', which isn't informative.
-    if (g_str_has_suffix(parent, "Type")) {
-        gsize len = strlen(parent);
-        short_parent = g_strndup(parent, len - 4);
-    }
-    else
-        short_parent = g_strdup(parent);
-
-    tmp_str = g_strdup_printf("%s-%s", short_parent, g_base_info_get_name(info));
-    public_name = gname_to_scm_constant_name(tmp_str);
-    g_free(short_parent);
-    g_free(tmp_str);
-    return public_name;
+    return scm_to_uint(scm_call_1(flags_to_number, val));
 }
 
 SCM
-gig_flag_define(GIEnumInfo *info, SCM defs)
+gig_int_to_enum(gint val, GType type)
 {
-    g_assert(info != NULL);
+    // TODO: implement
+    return scm_from_int(val);
+}
 
-    gint n_values = g_enum_info_get_n_values(info);
-    gint i = 0;
-    GIValueInfo *vi = NULL;
-    gchar *_public_name;
-    SCM public_name;
+SCM
+gig_uint_to_flags(guint val, GType type)
+{
+    // TODO: implement
+    return scm_from_uint(val);
+}
 
-    while (i < n_values) {
-        vi = g_enum_info_get_value(info, i);
-        _public_name = gig_flag_public_name(g_base_info_get_name(info), vi);
-        public_name = scm_from_utf8_symbol(_public_name);
-        gint64 val = g_value_info_get_value(vi);
-        SCM ret = scm_from_int64(val);
+static gchar *
+enum_info_to_class_name(GIEnumInfo *info)
+{
+    const gchar *namespace = g_base_info_get_namespace(info);
+    const gchar *prefix = g_irepository_get_c_prefix(NULL, namespace);
+    // use '%' to avoid name clashes
+    return g_strdup_printf("<%%%s%s>", prefix, g_base_info_get_name(info));
+}
 
-        g_debug("defining flag/enum %s and %" PRId64, _public_name, val);
-        scm_permanent_object(scm_define(public_name, ret));
-        defs = scm_cons(public_name, defs);
+SCM
+gig_int_to_enum_with_info(gint val, GIEnumInfo *info)
+{
+    // TODO: implement
+    return scm_from_int(val);
+}
 
-        g_base_info_unref(vi);
-        g_free(_public_name);
-        i++;
-    }
-    return defs;
+SCM
+gig_uint_to_flags_with_info(guint val, GIEnumInfo *info)
+{
+    // TODO: implement
+    return scm_from_uint(val);
+}
+
+void
+gig_flag_fini(void)
+{
+    g_hash_table_remove_all(gig_flag_hash);
 }
 
 void
 gig_init_flag(void)
 {
+    enum_to_number = scm_c_public_ref("gi types", "enum->number");
+    flags_to_number = scm_c_public_ref("gi types", "flags->number");
 
+    gig_flag_hash = g_hash_table_new(g_str_hash, g_str_equal);
+    atexit(gig_flag_fini);
+}
+
+SCM
+gig_define_enum(GIEnumInfo *info, SCM defs)
+{
+    gint n_values = g_enum_info_get_n_values(info);
+    gint i = 0;
+    GIValueInfo *vi = NULL;
+    gchar *_key;
+    SCM key, val;
+    SCM class;
+
+    gchar *name = enum_info_to_class_name(info);
+    gpointer _name, _type;
+    if (g_hash_table_lookup_extended(gig_flag_hash, name, &_name, &_type)) {
+        defs = scm_cons(SCM_PACK_POINTER(_type), defs);
+        return defs;
+    }
+
+    switch (g_base_info_get_type(info)) {
+    case GI_INFO_TYPE_ENUM:
+        class = scm_call_4(make_class_proc, scm_list_1(gig_enum_type), SCM_EOL, kwd_name,
+                           scm_from_utf8_symbol(name));
+        break;
+    case GI_INFO_TYPE_FLAGS:
+        class = scm_call_4(make_class_proc, scm_list_1(gig_flags_type), SCM_EOL, kwd_name,
+                           scm_from_utf8_symbol(name));
+        break;
+    default:
+        g_assert_not_reached();
+    }
+
+    SCM obarray = scm_make_hash_table(scm_from_int(n_values));
+
+    while (i < n_values) {
+        vi = g_enum_info_get_value(info, i);
+        _key = gig_gname_to_scm_name(g_base_info_get_name(vi));
+        key = scm_from_utf8_symbol(_key);
+        gint64 _val = g_value_info_get_value(vi);
+        val = scm_from_int64(_val);
+
+        g_debug("defining flag/enum %s and %" PRId64, _key, _val);
+        scm_hashq_set_x(obarray, key, val);
+
+        g_base_info_unref(vi);
+        g_free(_key);
+        i++;
+    }
+
+    scm_class_set_x(class, sym_obarray, obarray);
+
+    scm_define(scm_class_name(class), class);
+    defs = scm_cons(scm_class_name(class), defs);
+
+    g_hash_table_insert(gig_flag_hash, name, SCM_UNPACK_POINTER(defs));
+
+    return defs;
 }

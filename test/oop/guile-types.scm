@@ -9,7 +9,7 @@
    "my-param"
    "This is a test parameter"
    -200 200 0
-   PARAM_READWRITE))
+   (make <%GParamFlags> '(readwrite))))
 
 (define <TestParam>
   ((@ (gi) register-type)

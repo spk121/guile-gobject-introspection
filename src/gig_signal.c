@@ -3,6 +3,7 @@
 #include "gig_value.h"
 #include "gig_type.h"
 #include "gig_argument.h"
+#include "gig_flag.h"
 
 /******************
  *  Signal Specs  *
@@ -70,7 +71,7 @@ gig_signalspec_from_obj(SCM obj)
     for (guint i = 0; i < n_params; i++, sparams = scm_cdr(sparams))
         params[i] = scm_to_gtype(scm_car(sparams));
 
-    flags = scm_to_uint(gig_signal_ref(obj, GIG_SIGNAL_SLOT_FLAGS));
+    flags = gig_flags_to_uint(gig_signal_ref(obj, GIG_SIGNAL_SLOT_FLAGS));
 
     spec = g_new0(GigSignalSpec, 1);
     spec->signal_name = name;

@@ -108,10 +108,8 @@ gig_type_register(GType gtype)
     }
 }
 
-static SCM make_class_proc;
 static SCM make_instance_proc;
 static SCM make_fundamental_proc;
-static SCM kwd_name;
 static SCM kwd_value;
 static SCM sym_value;
 static SCM sym_ref;
@@ -227,9 +225,46 @@ gig_type_define(GType gtype, SCM defs)
 
         switch (fundamental) {
         case G_TYPE_ENUM:
+        {
+            GEnumClass *class = g_type_class_ref(gtype);
+            SCM size = scm_from_uint(class->n_values);
+            SCM obarray = scm_make_hash_table(size);
+
+            for (guint i = 0; i < class->n_values; i++) {
+                SCM key = scm_from_utf8_symbol(class->values[i].value_nick);
+                SCM value = scm_from_int(class->values[i].value);
+                scm_hashq_set_x(obarray, key, value);
+            }
+            g_type_class_unref(class);
+
+            dsupers = scm_list_1(SCM_PACK_POINTER(sparent));
+            new_type = scm_call_4(make_class_proc, dsupers, slots, kwd_name,
+                                  type_class_name);
+
+            scm_class_set_x(new_type, sym_obarray, obarray);
+            break;
+        }
+
         case G_TYPE_FLAGS:
-            g_warning("enums not yet handled");
-            return defs;
+        {
+            GFlagsClass *class = g_type_class_ref(gtype);
+            SCM size = scm_from_uint(class->n_values);
+            SCM obarray = scm_make_hash_table(size);
+
+            for (guint i = 0; i < class->n_values; i++) {
+                SCM key = scm_from_utf8_symbol(class->values[i].value_nick);
+                SCM value = scm_from_int(class->values[i].value);
+                scm_hashq_set_x(obarray, key, value);
+            }
+            g_type_class_unref(class);
+
+            dsupers = scm_list_1(SCM_PACK_POINTER(sparent));
+            new_type = scm_call_4(make_class_proc, dsupers, slots, kwd_name,
+                                  type_class_name);
+
+            scm_class_set_x(new_type, sym_obarray, obarray);
+            break;
+        }
 
         case G_TYPE_BOXED:
         {
@@ -693,6 +728,7 @@ gig_init_types_once(void)
     sym_unref = scm_from_utf8_symbol("unref");
     sym_size = scm_from_utf8_symbol("size");
     sym_sort_key = scm_from_utf8_symbol("sort-key");
+    sym_obarray = scm_from_utf8_symbol("obarray");
 
     gig_type_gtype_hash = g_hash_table_new(g_direct_hash, g_direct_equal);
 #if ENABLE_GIG_TYPE_SCM_HASH
