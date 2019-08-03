@@ -20,7 +20,9 @@
 
   #:export (<GIBaseInfo>
             enum->number
-            flags->number))
+            flags->number
+            number->enum
+            number->flags))
 
 (eval-when (expand load eval)
   ;; this library is loaded before any other, so init logging here
@@ -40,6 +42,17 @@
 (define-method (enum->number (class <class>) (symbol <symbol>))
   (enum->number (make class #:value symbol)))
 
+(define-method (number->enum-value (class <class>) (number <number>))
+  (hash-fold (lambda (key value seed)
+               (if (= value number) key seed))
+             0 (class-slot-ref class 'obarray)))
+
+(define-method (number->enum (class <class>) (number <number>))
+  (make class #:value (number->enum-value class number)))
+
+(define-method (number->enum (class <class>))
+  (lambda (number) (number->enum class number)))
+
 (define-method (flags->number (number <number>))
   (format (current-error-port) "WARNING: passing number ~a as flags~%" number)
   (display-backtrace (make-stack #t 1) (current-error-port))
@@ -54,3 +67,14 @@
 
 (define-method (flags->number (class <class>) (list <list>))
   (flags->number (make class #:value list)))
+
+(define-method (number->flags-value (class <class>) (number <number>))
+  (hash-fold (lambda (key value seed)
+               (if (logtest value number) (cons key seed) seed))
+             '() (class-slot-ref class 'obarray)))
+
+(define-method (number->flags (class <class>) (number <number>))
+  (make class #:value (number->flags-value class number)))
+
+(define-method (number->flags (class <class>))
+  (lambda (number) (number->flags class number)))
