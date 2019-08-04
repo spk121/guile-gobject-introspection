@@ -179,6 +179,7 @@ TESTS = \
  $(STANDARD_MACROS_TESTS) \
  $(BYTE_ORDER_MACROS_TESTS) \
  $(NUMERICAL_DEFINITIONS_TESTS) \
+ $(ATOMIC_OPERATIONS_TESTS) \
  $(MESSAGE_OUTPUT_TESTS) \
  $(MAIN_EVENT_LOOP_TESTS) \
  $(MEMORY_ALLOCATION_TESTS) \
@@ -205,8 +206,7 @@ TESTS = \
  misc/use-typelibs.scm \
  misc/interfaces.scm
 
-XFAIL_TESTS = \
- everything/array-enum-in.scm
+XFAIL_TESTS = 
 
 if HAVE_INTROSPECTION
 

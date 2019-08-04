@@ -22,6 +22,8 @@
 
 static SCM enum_to_number;
 static SCM flags_to_number;
+static SCM number_to_enum;
+static SCM number_to_flags;
 
 GHashTable *gig_flag_hash = NULL;
 
@@ -38,17 +40,19 @@ gig_flags_to_uint(SCM val)
 }
 
 SCM
-gig_int_to_enum(gint val, GType type)
+gig_int_to_enum(gint v, GType gtype)
 {
-    // TODO: implement
-    return scm_from_int(val);
+    SCM type = gig_type_get_scheme_type(gtype);
+    SCM val = scm_from_int(v);
+    return scm_call_2(number_to_enum, type, val);
 }
 
 SCM
-gig_uint_to_flags(guint val, GType type)
+gig_uint_to_flags(guint v, GType gtype)
 {
-    // TODO: implement
-    return scm_from_uint(val);
+    SCM type = gig_type_get_scheme_type(gtype);
+    SCM val = scm_from_uint(v);
+    return scm_call_2(number_to_flags, type, val);
 }
 
 static gchar *
@@ -60,18 +64,30 @@ enum_info_to_class_name(GIEnumInfo *info)
     return g_strdup_printf("<%%%s%s>", prefix, g_base_info_get_name(info));
 }
 
-SCM
-gig_int_to_enum_with_info(gint val, GIEnumInfo *info)
+static SCM
+gig_flag_ref(GIEnumInfo *info)
 {
-    // TODO: implement
-    return scm_from_int(val);
+    gig_define_enum(info, SCM_UNDEFINED);
+    gchar *name = enum_info_to_class_name(info);
+    gpointer type = g_hash_table_lookup(gig_flag_hash, name);
+    g_free(name);
+    return SCM_PACK_POINTER(type);
 }
 
 SCM
-gig_uint_to_flags_with_info(guint val, GIEnumInfo *info)
+gig_int_to_enum_with_info(gint v, GIEnumInfo *info)
 {
-    // TODO: implement
-    return scm_from_uint(val);
+    SCM type = gig_flag_ref(info);
+    SCM val = scm_from_int(v);
+    return scm_call_2(number_to_enum, type, val);
+}
+
+SCM
+gig_uint_to_flags_with_info(guint v, GIEnumInfo *info)
+{
+    SCM type = gig_flag_ref(info);
+    SCM val = scm_from_uint(v);
+    return scm_call_2(number_to_flags, type, val);
 }
 
 void
@@ -85,6 +101,8 @@ gig_init_flag(void)
 {
     enum_to_number = scm_c_public_ref("gi types", "enum->number");
     flags_to_number = scm_c_public_ref("gi types", "flags->number");
+    number_to_enum = scm_c_public_ref("gi types", "number->enum");
+    number_to_flags = scm_c_public_ref("gi types", "number->flags");
 
     gig_flag_hash = g_hash_table_new(g_str_hash, g_str_equal);
     atexit(gig_flag_fini);
@@ -103,6 +121,7 @@ gig_define_enum(GIEnumInfo *info, SCM defs)
     gchar *name = enum_info_to_class_name(info);
     gpointer _name, _type;
     if (g_hash_table_lookup_extended(gig_flag_hash, name, &_name, &_type)) {
+        g_free(name);
         defs = scm_cons(SCM_PACK_POINTER(_type), defs);
         return defs;
     }
@@ -142,7 +161,7 @@ gig_define_enum(GIEnumInfo *info, SCM defs)
     scm_define(scm_class_name(class), class);
     defs = scm_cons(scm_class_name(class), defs);
 
-    g_hash_table_insert(gig_flag_hash, name, SCM_UNPACK_POINTER(defs));
+    g_hash_table_insert(gig_flag_hash, name, SCM_UNPACK_POINTER(class));
 
     return defs;
 }

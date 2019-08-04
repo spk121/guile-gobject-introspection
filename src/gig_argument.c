@@ -975,13 +975,42 @@ scm_to_c_native_indirect_object_array(S2C_ARG_DECL)
 }
 
 static void
+scm_to_c_native_enum_array(S2C_ARG_DECL)
+{
+    if (scm_is_true(scm_list_p(object))) {
+        gsize length = scm_to_size_t(scm_length(object));
+        *size = length;
+        gint *ptr;
+        if (entry->array_is_zero_terminated)
+            ptr = g_new0(gint, length + 1);
+        else
+            ptr = g_new0(gint, length);
+        arg->v_pointer = ptr;
+        LATER_FREE(ptr);
+        SCM iter = object;
+
+        for (gsize i = 0; i < length; i++, iter = scm_cdr(iter))
+            switch (entry->referenced_base_type)
+            {
+            case GI_INFO_TYPE_ENUM:
+                ptr[i] = gig_enum_to_int(scm_car(iter));
+                break;
+            case GI_INFO_TYPE_FLAGS:
+                ptr[i] = (gint)gig_flags_to_uint(scm_car(iter));
+                break;
+            }
+    }
+    else
+        g_assert_not_reached ();
+}
+
+static void
 scm_to_c_native_interface_array(S2C_ARG_DECL)
 {
 #define FUNC_NAME "%object->c-native-interface-array-arg"
     if ((entry->referenced_base_type == GI_INFO_TYPE_ENUM)
         || (entry->referenced_base_type == GI_INFO_TYPE_FLAGS)) {
-        g_assert_not_reached();
-        /* scm_to_c_native_immediate_array(S2C_ARGS); */
+        scm_to_c_native_enum_array(S2C_ARGS);
     }
     else if ((entry->referenced_base_type == GI_INFO_TYPE_STRUCT)
              || (entry->referenced_base_type == GI_INFO_TYPE_UNION)
