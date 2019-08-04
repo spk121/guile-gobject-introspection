@@ -16,7 +16,7 @@
  (begin
    (let ((app (make <GApplication>
                 #:application-id "gi.guile.Example"
-                #:flags (make <GApplicationFlags> '(handles-command-line))))
+                #:flags '(handles-command-line)))
          (success #f))
      ;; (display (flags->number (flags app)))
      (add-main-option app "hello" (char->integer #\h) 0

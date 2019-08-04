@@ -24,6 +24,8 @@ static SCM enum_to_number;
 static SCM flags_to_number;
 static SCM number_to_enum;
 static SCM number_to_flags;
+static SCM symbol_to_enum;
+static SCM list_to_flags;
 
 GHashTable *gig_flag_hash = NULL;
 
@@ -90,6 +92,18 @@ gig_uint_to_flags_with_info(guint v, GIEnumInfo *info)
     return scm_call_2(number_to_flags, type, val);
 }
 
+SCM
+gig_symbol_to_enum(SCM type, SCM symbol)
+{
+    return scm_call_2(symbol_to_enum, type, symbol);
+}
+
+SCM
+gig_list_to_flags(SCM type, SCM list)
+{
+    return scm_call_2(list_to_flags, type, list);
+}
+
 void
 gig_flag_fini(void)
 {
@@ -102,7 +116,9 @@ gig_init_flag(void)
     enum_to_number = scm_c_public_ref("gi types", "enum->number");
     flags_to_number = scm_c_public_ref("gi types", "flags->number");
     number_to_enum = scm_c_public_ref("gi types", "number->enum");
+    symbol_to_enum = scm_c_public_ref("gi types", "symbol->enum");
     number_to_flags = scm_c_public_ref("gi types", "number->flags");
+    list_to_flags = scm_c_public_ref("gi types", "list->flags");
 
     gig_flag_hash = g_hash_table_new(g_str_hash, g_str_equal);
     atexit(gig_flag_fini);

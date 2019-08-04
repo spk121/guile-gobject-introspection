@@ -145,16 +145,28 @@ gig_value_from_scm(GValue *value, SCM obj)
     }
     case G_TYPE_ENUM:
     {
-        if (!SCM_IS_A_P(obj, gig_enum_type))
+        if (SCM_IS_A_P(obj, gig_enum_type))
+            g_value_set_enum(value, gig_enum_to_int(obj));
+        else if (scm_is_symbol(obj)) {
+            SCM type = gig_type_get_scheme_type(value_type);
+            obj = gig_symbol_to_enum(type, obj);
+            g_value_set_enum(value, gig_enum_to_int(obj));
+        }
+        else
             return GIG_VALUE_WRONG_TYPE;
-        g_value_set_enum(value, gig_enum_to_int(obj));
         return 0;
     }
     case G_TYPE_FLAGS:
     {
-        if (!SCM_IS_A_P(obj, gig_flags_type))
+        if (SCM_IS_A_P(obj, gig_flags_type))
+            g_value_set_flags(value, gig_flags_to_uint(obj));
+        else if (scm_is_true(scm_list_p(obj))) {
+            SCM type = gig_type_get_scheme_type(value_type);
+            obj = gig_list_to_flags(type, obj);
+            g_value_set_flags(value, gig_flags_to_uint(obj));
+        }
+        else
             return GIG_VALUE_WRONG_TYPE;
-        g_value_set_flags(value, gig_flags_to_uint(obj));
         return 0;
     }
     case G_TYPE_FLOAT:

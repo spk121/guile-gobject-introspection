@@ -19,15 +19,18 @@
   #:use-module (gi oop)
 
   #:export (<GIBaseInfo>
-            enum->number
-            flags->number
-            number->enum
-            number->flags))
+            enum->number enum->symbol number->enum symbol->enum
+            flags->number flags->list number->flags list->flags))
 
 (eval-when (expand load eval)
   ;; this library is loaded before any other, so init logging here
   (load-extension "libguile-gi" "gig_init_logging")
   (load-extension "libguile-gi" "gig_init_types"))
+
+;;; Enum conversions
+
+(define-method (enum->symbol (enum <GEnum>))
+  (slot-ref enum 'value))
 
 (define-method (enum->number (number <number>))
   (format (current-error-port) "WARNING: passing number ~a as enum~%" number)
@@ -47,11 +50,21 @@
                (if (= value number) key seed))
              0 (class-slot-ref class 'obarray)))
 
+(define-method (symbol->enum (class <class>) (symbol <symbol>))
+  (if (hashq-ref (class-slot-ref class 'obarray) symbol)
+      (make class #:value symbol)
+      (error "not a valid enum value")))
+
+(define-method (symbol->enum (class <class>))
+  (lambda (symbol) (symbol->enum class symbol)))
+
 (define-method (number->enum (class <class>) (number <number>))
-  (make class #:value (number->enum-value class number)))
+  (symbol->enum class (number->enum-value class number)))
 
 (define-method (number->enum (class <class>))
   (lambda (number) (number->enum class number)))
+
+;;; Flag conversions
 
 (define-method (flags->number (number <number>))
   (format (current-error-port) "WARNING: passing number ~a as flags~%" number)
@@ -62,11 +75,18 @@
   (let ((value (slot-ref flags 'value))
         (obarray (slot-ref flags 'obarray)))
     (apply logior
-           (map (lambda (v) (hashq-ref obarray v 0))
+           (map (lambda (v)
+                  (or (hashq-ref obarray v)
+                      (begin
+                        (format (current-error-port) "WARNING: invalid flag ~a~%" v)
+                        0)))
                 value))))
 
 (define-method (flags->number (class <class>) (list <list>))
   (flags->number (make class #:value list)))
+
+(define-method (flags->list (flags <GFlags>))
+  (slot-ref flags 'value))
 
 (define-method (number->flags-value (class <class>) (number <number>))
   (hash-fold (lambda (key value seed)
@@ -78,6 +98,15 @@
 
 (define-method (number->flags (class <class>))
   (lambda (number) (number->flags class number)))
+
+(define-method (list->flags (class <class>) (list <list>))
+  ;; canonicalize by converting to number and back
+  (number->flags class (flags->number class list)))
+
+(define-method (list->flags (class <class>))
+  (lambda (flags) (list->flags class flags)))
+
+;;; Enum/Flag printing
 
 (define-method (display (enum <GEnum>) port)
   (display (slot-ref enum 'value) port))
@@ -91,6 +120,8 @@
 (define-method (write (flags <GFlags>) port)
   (format port "#<~s ~a>" (class-name (class-of flags)) (slot-ref flags 'value)))
 
+;;; Enum equality
+
 (define-method (= (enum1 <GEnum>) (enum2 <GEnum>))
   (eq? (slot-ref enum1 'value) (slot-ref enum2 'value)))
 
@@ -103,6 +134,8 @@
 (define-method (equal? (enum1 <GEnum>) (enum2 <GEnum>))
   (and (equal? (class-of enum1) (class-of enum2))
        (eq? (slot-ref enum1 'value) (slot-ref enum2 'value))))
+
+;;; Flag equality
 
 (define-method (= (flags <GFlags>) (number <number>))
   (= (flags->number flags) number))
