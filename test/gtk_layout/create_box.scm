@@ -11,9 +11,9 @@
 (automake-test
  (begin
    (init)
-   (let* ([box1 (box:new (make <GtkOrientation> 'vertical) 1)]
+   (let* ([box1 (box:new (symbol->orientation 'vertical) 1)]
           [box2 (make <GtkBox>
-                  #:orientation (make <GtkOrientation> 'vertical)
+                  #:orientation (symbol->orientation 'vertical)
                   #:spacing 2)])
      (format #t "box 1: ~S~%" box1)
      (format #t "box 1 spacing: ~S~%" (spacing box1))

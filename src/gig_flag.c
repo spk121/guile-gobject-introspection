@@ -24,7 +24,9 @@ static SCM enum_to_number;
 static SCM flags_to_number;
 static SCM number_to_enum;
 static SCM number_to_flags;
+static SCM enum_to_symbol;
 static SCM symbol_to_enum;
+static SCM flags_to_list;
 static SCM list_to_flags;
 
 GHashTable *gig_flag_hash = NULL;
@@ -64,6 +66,15 @@ enum_info_to_class_name(GIEnumInfo *info)
     const gchar *prefix = g_irepository_get_c_prefix(NULL, namespace);
     // use '%' to avoid name clashes
     return g_strdup_printf("<%%%s%s>", prefix, g_base_info_get_name(info));
+}
+
+static SCM
+gig_flag_peek(GIEnumInfo *info)
+{
+    gchar *name = enum_info_to_class_name(info);
+    gpointer type = g_hash_table_lookup(gig_flag_hash, name);
+    g_free(name);
+    return SCM_PACK_POINTER(type);
 }
 
 static SCM
@@ -116,12 +127,65 @@ gig_init_flag(void)
     enum_to_number = scm_c_public_ref("gi types", "enum->number");
     flags_to_number = scm_c_public_ref("gi types", "flags->number");
     number_to_enum = scm_c_public_ref("gi types", "number->enum");
+    enum_to_symbol = scm_c_public_ref("gi types", "enum->symbol");
     symbol_to_enum = scm_c_public_ref("gi types", "symbol->enum");
     number_to_flags = scm_c_public_ref("gi types", "number->flags");
     list_to_flags = scm_c_public_ref("gi types", "list->flags");
+    flags_to_list = scm_c_public_ref("gi types", "flags->list");
 
     gig_flag_hash = g_hash_table_new(g_str_hash, g_str_equal);
     atexit(gig_flag_fini);
+}
+
+static SCM
+define_conversion(const gchar *fmt, const gchar *name, SCM proc)
+{
+    gchar *_sym = g_strdup_printf(fmt, name);
+    SCM sym = scm_from_utf8_symbol(_sym);
+    g_free(_sym);
+    scm_define(sym, proc);
+    return sym;
+}
+
+SCM
+gig_define_enum_conversions(GIEnumInfo *info, GType type, SCM defs)
+{
+    SCM class;
+    scm_dynwind_begin(0);
+    gchar *cls = gig_gname_to_scm_name(g_base_info_get_name(info));
+    scm_dynwind_or_bust("%define-enum-conversions", cls);
+
+    if (type != G_TYPE_NONE)
+        class = gig_type_get_scheme_type(type);
+    else
+        class = gig_flag_peek(info);
+
+#define C(fmt, proc) \
+    do {                                                                \
+        defs = scm_cons(define_conversion(fmt, cls,                     \
+                                          scm_call_1(proc, class)),     \
+                        defs);                                          \
+    } while (0)
+
+    switch(g_base_info_get_type(info)) {
+    case GI_INFO_TYPE_ENUM:
+        C("%s->number", enum_to_number);
+        C("%s->symbol", enum_to_symbol);
+        C("number->%s", number_to_enum);
+        C("symbol->%s", symbol_to_enum);
+        break;
+    case GI_INFO_TYPE_FLAGS:
+        C("%s->number", flags_to_number);
+        C("%s->list", flags_to_list);
+        C("number->%s", number_to_flags);
+        C("list->%s", list_to_flags);
+        break;
+    default:
+        g_assert_not_reached();
+    }
+    scm_dynwind_end();
+
+    return defs;
 }
 
 SCM
@@ -130,6 +194,7 @@ gig_define_enum(GIEnumInfo *info, SCM defs)
     gint n_values = g_enum_info_get_n_values(info);
     gint i = 0;
     GIValueInfo *vi = NULL;
+    GIInfoType t = g_base_info_get_type(info);
     gchar *_key;
     SCM key, val;
     SCM class;
@@ -142,7 +207,7 @@ gig_define_enum(GIEnumInfo *info, SCM defs)
         return defs;
     }
 
-    switch (g_base_info_get_type(info)) {
+    switch (t) {
     case GI_INFO_TYPE_ENUM:
         class = scm_call_4(make_class_proc, scm_list_1(gig_enum_type), SCM_EOL, kwd_name,
                            scm_from_utf8_symbol(name));
@@ -162,7 +227,16 @@ gig_define_enum(GIEnumInfo *info, SCM defs)
         _key = gig_gname_to_scm_name(g_base_info_get_name(vi));
         key = scm_from_utf8_symbol(_key);
         gint64 _val = g_value_info_get_value(vi);
-        val = scm_from_int64(_val);
+        SCM val;
+
+        switch (t) {
+        case GI_INFO_TYPE_ENUM:
+            val = scm_from_int(_val);
+            break;
+        case GI_INFO_TYPE_FLAGS:
+            val = scm_from_uint(_val);
+            break;
+        }
 
         g_debug("defining flag/enum %s and %" PRId64, _key, _val);
         scm_hashq_set_x(obarray, key, val);

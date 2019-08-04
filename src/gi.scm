@@ -112,9 +112,9 @@
    ((subclass? type <GBoxed>)
     ((@@ (gi types) %allocate-boxed) type))
    ((subclass? type <GEnum>)
-    (make type #:value (car rest)))
+    (error "use symbol->enum or number->enum instead"))
    ((subclass? type <GFlags>)
-    (make type #:value (car rest)))
+    (error "use list->flags or number->flags instead"))
    (else
     (apply make type rest))))
 

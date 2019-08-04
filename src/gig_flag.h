@@ -32,6 +32,7 @@ SCM gig_uint_to_flags_with_info(guint val, GIEnumInfo *info);
 SCM gig_symbol_to_enum(SCM type, SCM symbol);
 SCM gig_list_to_flags(SCM type, SCM symbol);
 
+SCM gig_define_enum_conversions(GIEnumInfo *info, GType type, SCM defs);
 SCM gig_define_enum(GIEnumInfo *info, SCM defs);
 
 void gig_init_flag(void);

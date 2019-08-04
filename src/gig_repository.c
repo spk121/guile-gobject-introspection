@@ -181,6 +181,7 @@ load_info(GIBaseInfo *info, LoadFlags flags, SCM defs)
             defs = gig_define_enum(info, defs);
         else
             defs = gig_type_define(gtype, defs);
+        defs = gig_define_enum_conversions(info, gtype, defs);
         break;
     }
     case GI_INFO_TYPE_OBJECT:

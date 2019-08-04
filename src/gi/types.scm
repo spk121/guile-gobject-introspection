@@ -32,6 +32,15 @@
 (define-method (enum->symbol (enum <GEnum>))
   (slot-ref enum 'value))
 
+(define-method (enum->symbol (class <class>) (enum <GEnum>))
+  (if (is-a? enum class)
+      (enum->symbol enum)
+      (scm-error 'wrong-type-arg "enum->symbol" "expected ~a"
+                 (list (class-name class)) (list enum))))
+
+(define-method (enum->symbol (class <class>))
+  (lambda (enum) (enum->symbol class enum)))
+
 (define-method (enum->number (number <number>))
   (format (current-error-port) "WARNING: passing number ~a as enum~%" number)
   (display-backtrace (make-stack #t 1) (current-error-port))
@@ -42,8 +51,17 @@
         (obarray (slot-ref enum 'obarray)))
     (hashq-ref obarray value)))
 
+(define-method (enum->number (class <class>) (enum <GEnum>))
+  (if (is-a? enum class)
+      (enum->number enum)
+      (scm-error 'wrong-type-arg "enum->number" "expected ~a"
+                 (list (class-name class)) (list enum))))
+
 (define-method (enum->number (class <class>) (symbol <symbol>))
   (enum->number (make class #:value symbol)))
+
+(define-method (enum->number (class <class>))
+  (lambda (symbol) (enum->number class symbol)))
 
 (define-method (number->enum-value (class <class>) (number <number>))
   (hash-fold (lambda (key value seed)
@@ -82,11 +100,32 @@
                         0)))
                 value))))
 
+(define-method (flags->number (class <class>) (flags <GFlags>))
+  (if (is-a? flags class)
+      (flags->number flags)
+      (scm-error 'wrong-type-arg "flags->number" "expected ~a"
+                 (list (class-name class)) (list flags))))
+
 (define-method (flags->number (class <class>) (list <list>))
   (flags->number (make class #:value list)))
 
+(define-method (flags->number (class <class>))
+  (lambda (list) (flags->number class list)))
+
 (define-method (flags->list (flags <GFlags>))
   (slot-ref flags 'value))
+
+(define-method (flags->list (class <class>) (flags <GFlags>))
+  (if (is-a? flags class)
+      (flags->list flags)
+      (scm-error 'wrong-type-arg "flags->list" "expected ~a"
+                 (list (class-name class)) (list flags))))
+
+(define-method (flags->list (class <class>))
+  (lambda (flags) (flags->list class flags)))
+
+(define-method (flags->list (class <class>))
+  (lambda (list) (flags->list flags list)))
 
 (define-method (number->flags-value (class <class>) (number <number>))
   (hash-fold (lambda (key value seed)

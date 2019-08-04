@@ -6,7 +6,7 @@
 (define my-signal
   (make-signal
    #:name "my-signal"
-   #:flags (make <%GSignalFlags> '(detailed))
+   #:flags (list->signal-flags '(detailed))
    #:return-type G_TYPE_NONE))
 
 (define <TestParam>
