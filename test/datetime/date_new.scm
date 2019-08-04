@@ -11,4 +11,4 @@
    (write day) (newline)
    (write month) (newline)
    (and (equal? day 25)
-        (equal? month 12))))
+        (= month 12))))

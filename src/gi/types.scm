@@ -90,3 +90,30 @@
 
 (define-method (write (flags <GFlags>) port)
   (format port "#<~s ~a>" (class-name (class-of flags)) (slot-ref flags 'value)))
+
+(define-method (= (enum1 <GEnum>) (enum2 <GEnum>))
+  (eq? (slot-ref enum1 'value) (slot-ref enum2 'value)))
+
+(define-method (= (enum <GEnum>) (number <number>))
+  (= (enum->number enum) number))
+
+(define-method (= (number <number>) (enum <GEnum>))
+  (= number (enum->number enum)))
+
+(define-method (equal? (enum1 <GEnum>) (enum2 <GEnum>))
+  (and (equal? (class-of enum1) (class-of enum2))
+       (eq? (slot-ref enum1 'value) (slot-ref enum2 'value))))
+
+(define-method (= (flags <GFlags>) (number <number>))
+  (= (flags->number flags) number))
+
+(define-method (= (number <number>) (flags <GFlags>))
+  (= number (flags->number flags)))
+
+(define-method (= (flags1 <GFlags>) (flags2 <GFlags>))
+  (= (flags->number flags1) (flags->number flags2)))
+
+(define-method (equal? (flags1 <GFlags>) (flags2 <GFlags>))
+  (and (equal? (class-of flags1) (class-of flags2))
+       ;; compare with =, because flags need not be canonical
+       (= flags1 flags2)))
