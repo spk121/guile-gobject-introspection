@@ -78,3 +78,15 @@
 
 (define-method (number->flags (class <class>))
   (lambda (number) (number->flags class number)))
+
+(define-method (display (enum <GEnum>) port)
+  (display (slot-ref enum 'value) port))
+
+(define-method (display (flags <GFlags>) port)
+  (display (slot-ref enum 'value) port))
+
+(define-method (write (enum <GEnum>) port)
+  (format port "#<~s ~a>" (class-name (class-of enum)) (slot-ref enum 'value)))
+
+(define-method (write (flags <GFlags>) port)
+  (format port "#<~s ~a>" (class-name (class-of flags)) (slot-ref flags 'value)))
