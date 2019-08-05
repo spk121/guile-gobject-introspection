@@ -1,4 +1,4 @@
-;; Copyright (C), 2019 Michael L. Gran
+;; Copyright (C) 2019 Michael L. Gran
 
 ;; This program is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -15,12 +15,14 @@
 
 (define-module (gi types)
   #:use-module (oop goops)
+  #:use-module (srfi srfi-1)
+  #:use-module (srfi srfi-2)
   #:use-module (system foreign)
   #:use-module (gi oop)
 
   #:export (<GIBaseInfo>
             enum->number enum->symbol number->enum symbol->enum
-            flags->number flags->list number->flags list->flags))
+            flags->number flags->list number->flags list->flags flags-set?))
 
 (eval-when (expand load eval)
   ;; this library is loaded before any other, so init logging here
@@ -30,7 +32,10 @@
 ;;; Enum conversions
 
 (define-method (enum->symbol (enum <GEnum>))
-  (slot-ref enum 'value))
+  (let ((expected (slot-ref enum 'value)))
+    (hash-fold (lambda (key value seed)
+                 (if (= value expected) key seed))
+               #f (slot-ref enum 'obarray))))
 
 (define-method (enum->symbol (class <class>) (enum <GEnum>))
   (if (is-a? enum class)
@@ -47,9 +52,7 @@
   number)
 
 (define-method (enum->number (enum <GEnum>))
-  (let ((value (slot-ref enum 'value))
-        (obarray (slot-ref enum 'obarray)))
-    (hashq-ref obarray value)))
+  (slot-ref enum 'value))
 
 (define-method (enum->number (class <class>) (enum <GEnum>))
   (if (is-a? enum class)
@@ -58,26 +61,29 @@
                  (list (class-name class)) (list enum))))
 
 (define-method (enum->number (class <class>) (symbol <symbol>))
-  (enum->number (make class #:value symbol)))
+  (hashq-ref (class-slot-ref class 'obarray) symbol))
 
 (define-method (enum->number (class <class>))
   (lambda (symbol) (enum->number class symbol)))
 
-(define-method (number->enum-value (class <class>) (number <number>))
-  (hash-fold (lambda (key value seed)
-               (if (= value number) key seed))
-             0 (class-slot-ref class 'obarray)))
-
 (define-method (symbol->enum (class <class>) (symbol <symbol>))
-  (if (hashq-ref (class-slot-ref class 'obarray) symbol)
-      (make class #:value symbol)
-      (error "not a valid enum value")))
+  (or (and-let* ((obarray (class-slot-ref class 'obarray))
+                 (value (hashq-ref obarray symbol)))
+        (make class #:value value))
+      (scm-error 'out-of-range "symbol->enum"
+                 "not defined in ~A" (list class) (list symbol))))
 
 (define-method (symbol->enum (class <class>))
   (lambda (symbol) (symbol->enum class symbol)))
 
 (define-method (number->enum (class <class>) (number <number>))
-  (symbol->enum class (number->enum-value class number)))
+  (or
+   (hash-fold
+    (lambda (key value seed)
+      (if (= value number) (make class #:value value) seed))
+    #f (class-slot-ref class 'obarray))
+   (scm-error 'out-of-range "number->enum"
+              "not bound in ~A" (list class) (list symbol))))
 
 (define-method (number->enum (class <class>))
   (lambda (number) (number->enum class number)))
@@ -90,30 +96,38 @@
   number)
 
 (define-method (flags->number (flags <GFlags>))
-  (let ((value (slot-ref flags 'value))
-        (obarray (slot-ref flags 'obarray)))
-    (apply logior
-           (map (lambda (v)
-                  (or (hashq-ref obarray v)
-                      (begin
-                        (format (current-error-port) "WARNING: invalid flag ~a~%" v)
-                        0)))
-                value))))
+  (slot-ref flags 'value))
 
-(define-method (flags->number (class <class>) (flags <GFlags>))
-  (if (is-a? flags class)
-      (flags->number flags)
-      (scm-error 'wrong-type-arg "flags->number" "expected ~a"
-                 (list (class-name class)) (list flags))))
+(define-method (number->flags (class <class>) (number <number>))
+  ((lambda (flags)
+     (if (= (flags->number flags) number)
+         flags
+         (scm-error 'out-of-range "number->flags"
+                    "strange flags seem set" '() (list number))))
+   (hash-fold
+    (lambda (key value seed)
+      (if (= (logand number value) value)
+          (logior value seed)
+          seed))
+    0 (class-slot-ref class 'obarray))))
 
-(define-method (flags->number (class <class>) (list <list>))
-  (flags->number (make class #:value list)))
+(define-method (number->flags (class <class>))
+  (lambda (number) (number->flags class number)))
 
-(define-method (flags->number (class <class>))
-  (lambda (list) (flags->number class list)))
+(define-method (flags-set? (flags <GFlags>) (number <number>))
+  (= (logand (slot-ref flags 'value) number) number))
+
+(define-method (flags-set? (flags <GFlags>) (symbol <symbol>))
+  (flags-set? flags (hashq-ref (slot-ref flags 'obarray) symbol)))
+
+(define-method (flags-set? (flags <GFlags>) (list <list>))
+  (every flags-set? list))
 
 (define-method (flags->list (flags <GFlags>))
-  (slot-ref flags 'value))
+  (hash-fold
+   (lambda (key value seed)
+     (if (flags-set? flags value) (cons key seed) seed))
+   '() (slot-ref flags 'obarray)))
 
 (define-method (flags->list (class <class>) (flags <GFlags>))
   (if (is-a? flags class)
@@ -124,40 +138,43 @@
 (define-method (flags->list (class <class>))
   (lambda (flags) (flags->list class flags)))
 
-(define-method (flags->list (class <class>))
-  (lambda (list) (flags->list flags list)))
-
-(define-method (number->flags-value (class <class>) (number <number>))
-  (hash-fold (lambda (key value seed)
-               (if (logtest value number) (cons key seed) seed))
-             '() (class-slot-ref class 'obarray)))
-
-(define-method (number->flags (class <class>) (number <number>))
-  (make class #:value (number->flags-value class number)))
-
-(define-method (number->flags (class <class>))
-  (lambda (number) (number->flags class number)))
-
 (define-method (list->flags (class <class>) (list <list>))
-  ;; canonicalize by converting to number and back
-  (number->flags class (flags->number class list)))
+  (let* ((obarray (class-slot-ref class 'obarray))
+         (lookup (lambda (symbol)
+                   (or (hashq-ref obarray symbol)
+                       (scm-error 'out-of-range "list->flags"
+                                  "not defined in ~A" (list class)
+                                  (list symbol))))))
+    (make class #:value (apply logior (map lookup list)))))
 
 (define-method (list->flags (class <class>))
   (lambda (flags) (list->flags class flags)))
 
+(define-method (flags->number (class <class>) (flags <GFlags>))
+  (if (is-a? flags class)
+      (flags->number flags)
+      (scm-error 'wrong-type-arg "flags->number" "expected ~a"
+                 (list (class-name class)) (list flags))))
+
+(define-method (flags->number (class <class>) (list <list>))
+  (flags->number (list->flags class list)))
+
+(define-method (flags->number (class <class>))
+  (lambda (list) (flags->number class list)))
+
 ;;; Enum/Flag printing
 
 (define-method (display (enum <GEnum>) port)
-  (display (slot-ref enum 'value) port))
+  (display (enum->symbol enum) port))
 
 (define-method (display (flags <GFlags>) port)
-  (display (slot-ref enum 'value) port))
+  (display (flags->list enum) port))
 
 (define-method (write (enum <GEnum>) port)
-  (format port "#<~s ~a>" (class-name (class-of enum)) (slot-ref enum 'value)))
+  (format port "#<~s ~a>" (class-name (class-of enum)) (enum->symbol enum)))
 
 (define-method (write (flags <GFlags>) port)
-  (format port "#<~s ~a>" (class-name (class-of flags)) (slot-ref flags 'value)))
+  (format port "#<~s ~a>" (class-name (class-of flags)) (flags->list flags)))
 
 ;;; Enum equality
 
@@ -177,15 +194,14 @@
 ;;; Flag equality
 
 (define-method (= (flags <GFlags>) (number <number>))
-  (= (flags->number flags) number))
+  (= (slot-ref flags 'value) number))
 
 (define-method (= (number <number>) (flags <GFlags>))
-  (= number (flags->number flags)))
+  (= number (slot-ref flags 'value)))
 
 (define-method (= (flags1 <GFlags>) (flags2 <GFlags>))
-  (= (flags->number flags1) (flags->number flags2)))
+  (= (slot-ref flags1 'value) (slot-ref flags2 'value)))
 
 (define-method (equal? (flags1 <GFlags>) (flags2 <GFlags>))
   (and (equal? (class-of flags1) (class-of flags2))
-       ;; compare with =, because flags need not be canonical
        (= flags1 flags2)))
