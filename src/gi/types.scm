@@ -168,7 +168,7 @@
   (display (enum->symbol enum) port))
 
 (define-method (display (flags <GFlags>) port)
-  (display (flags->list enum) port))
+  (display (flags->list flags) port))
 
 (define-method (write (enum <GEnum>) port)
   (format port "#<~s ~a>" (class-name (class-of enum)) (enum->symbol enum)))

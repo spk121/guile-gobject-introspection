@@ -117,7 +117,15 @@ pkgguileobject_DATA = \
 
 $(pkgguileobject_DATA): libguile-gi.la
 
-GUILEC_FLAGS = -Warity-mismatch -Wformat --load-path=$(abs_srcdir) --load-path=$(abs_builddir)
+GUILEC_FLAGS = \
+ -O2 \
+ -Warity-mismatch \
+ -Wformat \
+ -Wmacro-use-before-definition \
+ -Wunbound-variable \
+ -Wunused-variable \
+ --load-path=$(abs_srcdir) \
+ --load-path=$(abs_builddir)
 
 .scm.go:
 	GUILE_AUTO_COMPILE=0 \
