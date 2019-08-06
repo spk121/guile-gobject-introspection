@@ -72,6 +72,8 @@ Reference Guide
 * GObject Signals::
 * GObject Properties::
 * Custom GObjects::              Defining new GObject classes
+* Enums and Flags::
+* Utilities::
 * More Stuff::
 
 @end detailmenu
@@ -368,6 +370,7 @@ their @file{.typelib} files.
 * GObject Signals::
 * GObject Properties::
 * Custom GObjects::              Defining new GObject classes
+* Enums and Flags::
 * Utilities::
 * More Stuff::
 @end menu
@@ -760,6 +763,176 @@ methods found in the @code{GObject} typelib.
 @end deffn
 
 To then make instances of your custom GObject type, use @code{make}.
+
+@c ----------------------------------------------------------------
+@node Enums and Flags
+@section Enums and Flags
+While GObject is an OOP framework and as such mainly focuses on objects, there
+also exists functionality to deal with enumerated types.
+Enumerated types are a way of converting raw numbers into meaningful expressions
+and broadly fit into two categories: enumerations and flags.
+Both assign tokens to numerical values at compile time, but their xuse is different.
+Enumerations are used for equality checks only, whereas flags can be composed
+through bitwise or, tested by bitwise and, and operated on in other ways -- as long
+as the basic operations are bitwise, the result will make some sense.
+
+In Scheme, the closest analogues to enumerations and flags are symbols and symbol lists.
+Symbol equality can be checked with @code{eq?}, symbol list equality with @code{equal?}
+and in Guile specifically, the other operations can be implemented based on the @code{lset-*}
+procedures.@footnote{Other implementations may offer similar functions -- otherwise they
+can be implemented by the user themselves.}
+However, both of these lose information needed to convert them into a numerical representation.
+
+In Guile-GI, we bind enumerations and flags to GOOPS objects as we do with every
+other object type. Specifically, enums derive from @code{<GEnum>} and flags derive from @code{<GFlags>}.
+
+@subsection Conversions
+@deffn Procedure number->enum (class <class>) (number <number>)
+@deffnx Procedure number->enum (class <class>)
+@deffnx Procedure number->flags (class <class>) (number <number>)
+@deffnx Procedure number->flags (class <class>)
+@deffnx Procedure number->@var{type} (number <number>)
+Converts @var{number} into an enum or flags of class @var{class}.
+Called with just @var{class}, produces a procedure, that can be used
+to call itself with just @var{number}.This is often referred to as currying.
+
+number->@var{type} calls the appropriate constructor for the given type. Note, that this
+type is shortened to its name without any prefixes.
+For instance, a @code{GtkOrientation} may be created using @code{number->orientation}.
+We will henceforth refer to this construction as ``binding @var{class} on @var{type}''
+@end deffn
+
+@deffn Procedure symbol->enum (class <class>) (symbol <symbol>)
+@deffnx Procedure symbol->enum (class <class>)
+@deffnx Procedure symbol->var{type} (symbol <symbol>)
+Converts @var{symbol} into an enum of class @var{class}.
+Curries. Binds @var{class} on @var{type}.
+@end deffn
+
+@deffn Procedure list->flags (class <class>) (list <list>)
+@deffnx Procedure list->flags (class <class>)
+@deffnx Procedure list->var{type} (list <list>)
+Converts @var{symbol} into flags of class @var{class}.
+Curries. Binds @var{class} on @var{type}.
+@end deffn
+
+@deffn Procedure enum->number (enum <GEnum>)
+@deffnx Procedure enum->number (class <class>) (enum <GEnum>)
+@deffnx Procedure enum->number (class <class>) (symbol <symbol>)
+@deffnx Procedure enum->number (class <class>)
+@deffnx Procedure @var{type}->number (class <class>)
+If @var{symbol} is given, returns the value represented by @var{symbol}
+in @var{class}.
+
+If @var{enum} is given, converts it to a symbol.
+If both @var{enum} and @var{class} are given, raises an error
+if @var{enum} is not of type @var{class}.
+
+Curries. Binds @var{class} on @var{type}.
+@end deffn
+
+@deffn Procedure enum->symbol (enum <GEnum>)
+@deffnx Procedure enum->symbol (class <class>) (enum <GEnum>)
+@deffnx Procedure enum->symbol (class <class>)
+@deffnx Procedure @var{type}->symbol (class <class>)
+Converts @var{enum} to a symbol. If @var{class} is given, raises an error
+if @var{enum} is not of type @var{class}.
+Curries. Binds @var{class} on @var{type}.
+@end deffn
+
+@deffn Procedure flags->number (enum <GEnum>)
+@deffnx Procedure flags->number (class <class>) (enum <GEnum>)
+@deffnx Procedure flags->number (class <class>) (list <list>)
+@deffnx Procedure flags->number (class <class>)
+@deffnx Procedure @var{type}->number (class <class>)
+If @var{list} is given, returns the value represented by @var{list}
+in @var{class}.
+
+If @var{flags} is given, converts it to a symbol.
+If both @var{flags} and @var{class} are given, raises an error
+if @var{flags} is not of type @var{class}.
+
+Curries. Binds @var{class} on @var{type}.
+@end deffn
+
+@deffn Procedure flags->list (enum <GEnum>)
+@deffnx Procedure flags->list (class <class>) (enum <GEnum>)
+@deffnx Procedure flags->list (class <class>)
+@deffnx Procedure @var{type}->list (class <class>)
+Converts @var{flags} to a list of symbols. If @var{class} is given, raises an error
+if @var{flags} is not of type @var{class}.
+Curries. Binds @var{flags} on @var{type}.
+@end deffn
+
+@subsection Standard Procedure overrides
+@code{<GEnum>} and @code{<GFlags>} display as their symbolic/list representation
+and also use them in write in lieu of their addresses.
+Enumerations can be numerically compared to enumerations and numbers using @code{=}.
+Flags can be numerically compared to flags and numbers using @code{=}.
+Enumerations and flags can be compared to enumerations and flags of the same type using
+@code{equal?}.
+
+@subsection R6RS-esque flag operations
+Some would certainly like to see an equivalence the enumerated types discussed above and
+R6RS enum sets. However, it turns out, that they are not compatible.
+Enumerations are not enum sets, because they are not sets -- they are atoms.
+Flags are not enum sets, because they don't have a universe.
+Instead, they have a numerical mask.
+In an enum universe, each value is distinct from any other. GObject flags can however
+be combinations of other flags.
+A commonly found pattern is @code{SOME_READWRITE = SOME_READ | SOME_WRITE} for example.
+Hiding @code{'readwrite} would take a lot of work just so we can explicitly go against the
+design of the library writer, which is not a good idea at all.
+
+To cope with this fact, we implement our own -- similar, albeit somewhat different --
+set of functions, that aim to be close to what you see in R6RS.
+
+@deffn Procedure flags-mask (class <class>)
+@deffnx Procedure flags-mask (flags <GFlags>)
+Returns flags of class @var{class}, that has all possible values set.
+If @var{flags} is given, @var{class} is inferred from it.
+@end deffn
+
+@deffn Procedure flags-union (flags <GFlags>) . rest
+Constructs the union of all flags given by @var{flags} and @var{rest}.
+All of them must belong to the same class.
+@end deffn
+
+@deffn Procedure flags-intersection (flags <GFlags>) . rest
+Constructs the intersection of all flags given by @var{flags} and @var{rest}.
+All of them must belong to the same class.
+@end deffn
+
+@deffn Procedure flags-difference (flags1 <GFlags>) (flags2 <GFlags>)
+Constructs the difference of @var{flags1} and @var{flags2}.
+Both of them must belong to the same class.
+@end deffn
+
+@deffn Procedure flags-complement (flags <GFlags>)
+Returns the flags not set in @var{flags}.
+@end deffn
+
+@deffn Procedure flags-set? (flags <GFlags>) (number <number>)
+@deffnx Procedure flags-set? (flags <GFlags>) (symbol <symbol>)
+@deffnx Procedure flags-set? (flags <GFlags>) (list <list>)
+Return @var{#t} if and only if the flag(s) given by @var{number}, @var{symbol}
+or @var{list} are set.
+@end deffn
+
+@deffn Procedure flags-projection
+@deffnx Procedure flags-projection/list (flags <GFlags>) (class <class>)
+@deffnx Procedure flags-projection/list (flags <GFlags>) (flags2 <GFlags>)
+@deffnx Procedure flags-projection/number (flags <GFlags>) (class <class>)
+@deffnx Procedure flags-projection/number (flags <GFlags>) (flags2 <GFlags>)
+Project @var{flags} onto class @var{class}. (@var{class} is inferred from @var{flags2}).
+
+@code{flags-projection/list} constructs flags from all symbols in @code{(flags->symbol flags)},
+that are valid in @code{class}.
+@code{flags-projection/number} constructs flags, that have the same bits set with respect to
+@code{(flags-mask class)}.
+
+@code{flags-projection} is an alias for @code{flags-projection/list}.
+@end deffn
 
 @c ----------------------------------------------------------------
 @node Utilities

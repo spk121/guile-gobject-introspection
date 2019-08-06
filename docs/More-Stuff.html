@@ -53,15 +53,15 @@ ul.no-bullet {list-style: none}
 Previous: <a href="Utilities.html#Utilities" accesskey="p" rel="prev">Utilities</a>, Up: <a href="Reference-Guide.html#Reference-Guide" accesskey="u" rel="up">Reference Guide</a> &nbsp; [<a href="index.html#SEC_Contents" title="Table of contents" rel="contents">Contents</a>][<a href="Index.html#Index" title="Index" rel="index">Index</a>]</p>
 </div>
 <hr>
-<span id="More-Stuff-1"></span><h3 class="section">3.10 More Stuff</h3>
+<span id="More-Stuff-1"></span><h3 class="section">3.11 More Stuff</h3>
 
-<span id="On-Guile-to-C-Type-Conversions"></span><h4 class="subsection">3.10.1 On Guile to C Type Conversions</h4>
+<span id="On-Guile-to-C-Type-Conversions"></span><h4 class="subsection">3.11.1 On Guile to C Type Conversions</h4>
 <p>Guile-GI uses a rule system to convert Guile procedure arguments to C
 types.  Typically these conversions between Guile and C types are
 straightforward, but, some conversions are tricky and need additional
 description.
 </p>
-<span id="Strings"></span><h4 class="subsubsection">3.10.1.1 Strings</h4>
+<span id="Strings"></span><h4 class="subsubsection">3.11.1.1 Strings</h4>
 <p>GObject libraries usually use UTF-8 encoding for their strings, while
 Guile uses a different encoding internally for its strings.  Thus
 every time a string is parameter is passed through to a C procedure, a
@@ -74,7 +74,7 @@ Guile-GI converts Guile strings to locale-encoded strings for those
 procedures.  Note that this may throw an encoding error if the Guile
 string cannot be represented in the current locale.
 </p>
-<span id="C-Arrays"></span><h4 class="subsection">3.10.2 C Arrays</h4>
+<span id="C-Arrays"></span><h4 class="subsection">3.11.2 C Arrays</h4>
 <p>There are many different types of C arrays, and the Guile types
 expected for GObject procedures that C arrays varies depending on the
 type required.
@@ -99,7 +99,7 @@ procedures directly.  Since arrays get converted to bytevectors, these
 procedures will likely fail to do anything sensible.
 </p></blockquote>
 
-<span id="Help_0021-Guile_002dGI-overrides-core-binding-X"></span><h4 class="subsection">3.10.3 Help! Guile-GI overrides core binding X</h4>
+<span id="Help_0021-Guile_002dGI-overrides-core-binding-X"></span><h4 class="subsection">3.11.3 Help! Guile-GI overrides core binding X</h4>
 <p>In most cases this is nothing to worry about. Guile-GI ensures, that
 the core binding is used as the default behaviour when the signature
 does not accidentally match that of a function in some typelib.
@@ -107,7 +107,7 @@ However, this can still cause issues when Guile-GI overrides syntax.
 To protect your syntax (or other variables you deeply care about), use
 the <code>protect</code> or <code>protect*</code> renamer from <code>(gi util)</code>.
 </p>
-<span id="Help_0021-Guile_002dGI-bindings-conflict-with-each-other"></span><h4 class="subsection">3.10.4 Help! Guile-GI bindings conflict with each other</h4>
+<span id="Help_0021-Guile_002dGI-bindings-conflict-with-each-other"></span><h4 class="subsection">3.11.4 Help! Guile-GI bindings conflict with each other</h4>
 <p>Most conflicts should be resolved using the <code>merge-generics</code> duplicate handler.
 However, this handler is not enabled by default, so you may want to push it to the
 default duplicate handlers. If this is still not working, you may somehow have ended up
