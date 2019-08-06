@@ -32,6 +32,7 @@ TEST_EXTENSIONS = .scm
 
 noinst_DATA = lib.scm \
   automake-test-lib.scm \
+  flags/flags.scm \
   grilo/base.scm
 
 TYPELIB_TESTS = \
@@ -172,6 +173,12 @@ OOP_TESTS = \
  oop/signal-accumulator.scm \
  oop/signal-block.scm
 
+FLAGS_TESTS = \
+ flags/complement.scm \
+ flags/difference.scm \
+ flags/projection.scm \
+ flags/union.scm
+
 TESTS = \
  $(TYPELIB_TESTS) \
  $(VERSION_INFORMATION_TESTS) \
@@ -202,11 +209,12 @@ TESTS = \
  $(GTK_LAYOUT_TESTS) \
  $(GRILO_TESTS) \
  $(OOP_TESTS) \
+ $(FLAGS_TESTS) \
  misc/softerror_create.scm \
  misc/use-typelibs.scm \
  misc/interfaces.scm
 
-XFAIL_TESTS = 
+XFAIL_TESTS =
 
 if HAVE_INTROSPECTION
 
@@ -230,9 +238,7 @@ AM_SCM_LOG_FLAGS = --no-auto-compile -L $(abs_top_builddir)/src -L $(abs_top_src
 
 EXTRA_DIST = \
   $(TESTS) \
-  lib.scm \
-  automake-test-lib.scm \
-  grilo/base.scm
+  $(noinst_DATA)
 
 CLEANFILES = tmp.txt
 

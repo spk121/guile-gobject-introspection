@@ -22,7 +22,10 @@
 
   #:export (<GIBaseInfo>
             enum->number enum->symbol number->enum symbol->enum
-            flags->number flags->list number->flags list->flags flags-set?))
+            flags->number flags->list number->flags list->flags flags-set?
+            flags-mask flags-union flags-intersection flags-difference
+            flags-complement flags-projection flags-projection/list
+            flags-projection/number))
 
 (eval-when (expand load eval)
   ;; this library is loaded before any other, so init logging here
@@ -104,12 +107,14 @@
          flags
          (scm-error 'out-of-range "number->flags"
                     "strange flags seem set" '() (list number))))
-   (hash-fold
-    (lambda (key value seed)
-      (if (= (logand number value) value)
-          (logior value seed)
-          seed))
-    0 (class-slot-ref class 'obarray))))
+   (make class
+     #:value
+     (hash-fold
+      (lambda (key value seed)
+        (if (= (logand number value) value)
+            (logior value seed)
+            seed))
+      0 (class-slot-ref class 'obarray)))))
 
 (define-method (number->flags (class <class>))
   (lambda (number) (number->flags class number)))
@@ -121,7 +126,7 @@
   (flags-set? flags (hashq-ref (slot-ref flags 'obarray) symbol)))
 
 (define-method (flags-set? (flags <GFlags>) (list <list>))
-  (every flags-set? list))
+  (every (lambda (f) (flags-set? flags f)) list))
 
 (define-method (flags->list (flags <GFlags>))
   (hash-fold
@@ -161,6 +166,64 @@
 
 (define-method (flags->number (class <class>))
   (lambda (list) (flags->number class list)))
+
+;;; rnrs enums analogues
+
+(define-method (flags-mask (class <class>))
+  (make class #:value
+        (hash-fold (lambda (key value seed) (logior value seed)) 0
+                   (class-slot-ref class 'obarray))))
+
+(define-method (flags-mask (flags <GFlags>))
+  (flags-mask (class-of flags)))
+
+(define-method (flags-union (flags1 <GFlags>) (flags2 <GFlags>))
+  (if (equal? (class-of flags1) (class-of flags2))
+      (make (class-of flags1) #:value
+            (logior (slot-ref flags1 'value)
+                    (slot-ref flags2 'value)))
+      (error "cannot unite flags of differing type")))
+
+(define-method (flags-union (car <GFlags>) . rest)
+  (fold flags-union car rest))
+
+(define-method (flags-intersection (flags1 <GFlags>) (flags2 <GFlags>))
+  (if (equal? (class-of flags1) (class-of flags2))
+      (make (class-of flags1) #:value
+            (logand (slot-ref flags1 'value)
+                    (slot-ref flags2 'value)))
+      (error "cannot unite flags of differing type")))
+
+(define-method (flags-intersection (car <GFlags>) . rest)
+  (fold flags-intersection car rest))
+
+(define-method (flags-difference (flags1 <GFlags>) (flags2 <GFlags>))
+  (if (equal? (class-of flags1) (class-of flags2))
+      (make (class-of flags1) #:value
+            (logxor (slot-ref flags1 'value)
+                    (slot-ref flags2 'value)))
+      (error "cannot unite flags of differing type")))
+
+(define-method (flags-complement (flags <GFlags>))
+  (flags-difference flags (flags-mask flags)))
+
+(define-method (flags-projection/list (flags <GFlags>) (class <class>))
+  (let ((v (flags->list flags))
+        (m (flags->list (flags-mask class))))
+    (list->flags class (lset-intersection eq? v m))))
+
+(define-method (flags-projection/list (flags <GFlags>) (flags2 <GFlags>))
+  (flags-projection/list flags (class-of flags2)))
+
+(define-method (flags-projection/number (flags <GFlags>) (class <class>))
+  (let ((v (flags->number flags))
+        (m (flags->number (flags-mask class))))
+    (number->flags class (logand v m))))
+
+(define-method (flags-projection/number (flags <GFlags>) (flags2 <GFlags>))
+  (flags-projection/number flags (class-of flags2)))
+
+(define flags-projection flags-projection/list)
 
 ;;; Enum/Flag printing
 
