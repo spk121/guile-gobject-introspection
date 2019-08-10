@@ -184,7 +184,7 @@ fill_array_info(GigArgMapEntry *entry)
 
 
 static void
-gig_arg_map_entry_apply_arg_info(GigArgMapEntry *e, GIArgInfo *ai)
+gig_amap_entry_apply_arg_info(GigArgMapEntry *e, GIArgInfo *ai)
 {
     g_assert_nonnull(e);
     g_assert_nonnull(ai);
@@ -201,7 +201,7 @@ gig_arg_map_entry_apply_arg_info(GigArgMapEntry *e, GIArgInfo *ai)
 
 // This function gathers information about return values that are arrays.
 static void
-gig_arg_map_entry_apply_callable_info(GigArgMapEntry *e, GICallableInfo *ci)
+gig_amap_entry_apply_callable_info(GigArgMapEntry *e, GICallableInfo *ci)
 {
     g_assert_nonnull(e);
     g_assert_nonnull(ci);
@@ -218,7 +218,7 @@ gig_arg_map_entry_apply_callable_info(GigArgMapEntry *e, GICallableInfo *ci)
 
 // Gather information on how to map Scheme arguments to C arguments.
 GigArgMap *
-gig_arg_map_new(GICallableInfo *function_info)
+gig_amap_new(GICallableInfo *function_info)
 {
     gsize arg_info_count = g_callable_info_get_n_args(function_info);
     GigArgMap *amap = g_new0(GigArgMap, 1);
@@ -235,7 +235,7 @@ gig_arg_map_new(GICallableInfo *function_info)
         g_assert_cmpint(arg_info_index, <, entry_array->len);
         GIArgInfo *arg_info = g_callable_info_get_arg(function_info, arg_info_index);
         GigArgMapEntry *entry = g_ptr_array_index(entry_array, arg_info_index);
-        gig_arg_map_entry_apply_arg_info(entry, arg_info);
+        gig_amap_entry_apply_arg_info(entry, arg_info);
         g_base_info_unref(arg_info);
 
         entry->arg_info_index = arg_info_index;
@@ -306,7 +306,7 @@ gig_arg_map_new(GICallableInfo *function_info)
     }
 
     amap->return_val = arg_map_entry_new();
-    gig_arg_map_entry_apply_callable_info(amap->return_val, function_info);
+    gig_amap_entry_apply_callable_info(amap->return_val, function_info);
     if (amap->return_val->type_tag == GI_TYPE_TAG_ARRAY) {
         fill_array_info(amap->return_val);
         if (amap->return_val->array_length_index >= 0) {
@@ -358,7 +358,7 @@ gig_arg_map_new(GICallableInfo *function_info)
 }
 
 void
-gig_arg_map_free(GigArgMap *amap)
+gig_amap_free(GigArgMap *amap)
 {
     for (gint i = 0; i < amap->len; i++) {
         g_base_info_unref(amap->pdata[i]->type_info);
@@ -376,7 +376,7 @@ gig_arg_map_free(GigArgMap *amap)
 }
 
 void
-gig_arg_map_dump(const GigArgMap *amap)
+gig_amap_dump(const GigArgMap *amap)
 {
     g_debug("Arg map for '%s'", amap->name);
     g_debug(" SCM inputs required: %d, optional: %d, outputs: %d", amap->gsubr_required_input_count,
@@ -424,7 +424,7 @@ gig_arg_map_dump(const GigArgMap *amap)
 }
 
 void
-gig_arg_map_get_gsubr_args_count(const GigArgMap *amap, gint *required, gint *optional)
+gig_amap_get_gsubr_args_count(const GigArgMap *amap, gint *required, gint *optional)
 {
     g_assert_nonnull(amap);
     g_assert_nonnull(required);
@@ -434,7 +434,7 @@ gig_arg_map_get_gsubr_args_count(const GigArgMap *amap, gint *required, gint *op
 }
 
 GigArgMapEntry *
-gig_arg_map_get_entry(GigArgMap *amap, gint input)
+gig_amap_get_entry(GigArgMap *amap, gint input)
 {
     g_assert_nonnull(amap);
     gint i = 0;
@@ -448,7 +448,7 @@ gig_arg_map_get_entry(GigArgMap *amap, gint input)
 }
 
 GigArgMapEntry *
-gig_arg_map_get_output_entry(GigArgMap *amap, gint output)
+gig_amap_get_output_entry(GigArgMap *amap, gint output)
 {
     g_assert_nonnull(amap);
 
@@ -466,7 +466,7 @@ gig_arg_map_get_output_entry(GigArgMap *amap, gint output)
 // being its size, this returns TRUE and stores the index of the other
 // argument.
 gboolean
-gig_arg_map_has_output_array_size_index(GigArgMap *amap, gint cinvoke_output_index,
+gig_amap_has_output_array_size_index(GigArgMap *amap, gint cinvoke_output_index,
                                         gint *cinvoke_output_array_size_index)
 {
     g_assert_nonnull(amap);
@@ -488,7 +488,7 @@ gig_arg_map_has_output_array_size_index(GigArgMap *amap, gint cinvoke_output_ind
 // Get the number of required and optional gsubr arguments for this
 // gsubr call.
 void
-gig_arg_map_get_cinvoke_args_count(const GigArgMap *amap, gint *cinvoke_input_count,
+gig_amap_get_cinvoke_args_count(const GigArgMap *amap, gint *cinvoke_input_count,
                                    gint *cinvoke_output_count)
 {
     g_assert_nonnull(amap);
@@ -503,7 +503,7 @@ gig_arg_map_get_cinvoke_args_count(const GigArgMap *amap, gint *cinvoke_input_co
 // index positions for this argument in the C function call.  Return
 // TRUE if this gsubr argument is used in the C function call.
 gboolean
-gig_arg_map_get_cinvoke_indices(const GigArgMap *amap, gint gsubr_input_index,
+gig_amap_get_cinvoke_indices(const GigArgMap *amap, gint gsubr_input_index,
                                 gint *cinvoke_input_index, gint *cinvoke_output_index)
 {
     g_assert_nonnull(amap);
@@ -530,7 +530,7 @@ gig_arg_map_get_cinvoke_indices(const GigArgMap *amap, gint gsubr_input_index,
 // function call.  Return TRUE if this gsubr argument's array size is
 // used in the C function call.
 gboolean
-gig_arg_map_get_cinvoke_array_length_indices(const GigArgMap *amap, gint gsubr_input_index,
+gig_amap_get_cinvoke_array_length_indices(const GigArgMap *amap, gint gsubr_input_index,
                                              gint *cinvoke_input_index, gint *cinvoke_output_index)
 {
     g_assert_nonnull(amap);
@@ -560,7 +560,7 @@ gig_arg_map_get_cinvoke_array_length_indices(const GigArgMap *amap, gint gsubr_i
 }
 
 gboolean
-gig_arg_map_has_gsubr_output_index(const GigArgMap *amap, gint cinvoke_output_index,
+gig_amap_has_gsubr_output_index(const GigArgMap *amap, gint cinvoke_output_index,
                                    gint *gsubr_output_index)
 {
     g_assert_nonnull(amap);

@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef GIG_ARG_MAP_H
-#define GIG_ARG_MAP_H
+#ifndef GIG_AMAP_H
+#define GIG_AMAP_H
 
 #include <glib.h>
 #include <girepository.h>
@@ -145,24 +145,24 @@ struct _GigArgMap
     GigArgMapEntry *return_val;
 };
 
-GigArgMap *gig_arg_map_new(GICallableInfo *function_info);
-void gig_arg_map_free(GigArgMap *am);
-void gig_arg_map_dump(const GigArgMap *am);
+GigArgMap *gig_amap_new(GICallableInfo *function_info);
+void gig_amap_free(GigArgMap *am);
+void gig_amap_dump(const GigArgMap *am);
 
-void gig_arg_map_get_gsubr_args_count(const GigArgMap *am, gint *gsubr_required_input_count,
+void gig_amap_get_gsubr_args_count(const GigArgMap *am, gint *gsubr_required_input_count,
                                       gint *gsubr_optional_input_count);
-GigArgMapEntry *gig_arg_map_get_entry(GigArgMap *am, gint gsubr_input_index);
-GigArgMapEntry *gig_arg_map_get_output_entry(GigArgMap *am, gint cinvoke_output_index);
-gboolean gig_arg_map_has_output_array_size_index(GigArgMap *am, gint cinvoke_output_index,
+GigArgMapEntry *gig_amap_get_entry(GigArgMap *am, gint gsubr_input_index);
+GigArgMapEntry *gig_amap_get_output_entry(GigArgMap *am, gint cinvoke_output_index);
+gboolean gig_amap_has_output_array_size_index(GigArgMap *am, gint cinvoke_output_index,
                                                  gint *cinvoke_output_array_size_index);
-void gig_arg_map_get_cinvoke_args_count(const GigArgMap *am, gint *cinvoke_input_count,
+void gig_amap_get_cinvoke_args_count(const GigArgMap *am, gint *cinvoke_input_count,
                                         gint *cinvoke_output_count);
-gboolean gig_arg_map_get_cinvoke_indices(const GigArgMap *am, gint gsubr_input_index,
+gboolean gig_amap_get_cinvoke_indices(const GigArgMap *am, gint gsubr_input_index,
                                          gint *cinvoke_input_index, gint *cinvoke_output_index);
-gboolean gig_arg_map_get_cinvoke_array_length_indices(const GigArgMap *am, gint gsubr_input_index,
+gboolean gig_amap_get_cinvoke_array_length_indices(const GigArgMap *am, gint gsubr_input_index,
                                                       gint *cinvoke_input_index,
                                                       gint *cinvoke_output_index);
-gboolean gig_arg_map_has_gsubr_output_index(const GigArgMap *am, gint cinvoke_output_index,
+gboolean gig_amap_has_gsubr_output_index(const GigArgMap *am, gint cinvoke_output_index,
                                             gint *gsubr_output_index);
 G_END_DECLS
 #endif
