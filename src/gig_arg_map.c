@@ -17,6 +17,7 @@
 #include "gig_arg_map.h"
 
 const gchar dir_strings[GIG_ARG_DIRECTION_COUNT][9] = {
+    [GIG_ARG_DIRECTION_VOID] = "VOID",
     [GIG_ARG_DIRECTION_INPUT] = "INPUT",
     [GIG_ARG_DIRECTION_INOUT] = "INOUT",
     [GIG_ARG_DIRECTION_PREALLOCATED_OUTPUT] = "PREALLOC",

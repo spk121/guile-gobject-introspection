@@ -29,6 +29,7 @@ G_BEGIN_DECLS
 //  - arguments as they appear in g_function_info_invoke calls
 typedef enum
 {
+    GIG_ARG_DIRECTION_VOID,
     GIG_ARG_DIRECTION_INPUT,
     GIG_ARG_DIRECTION_INOUT,
     GIG_ARG_DIRECTION_PREALLOCATED_OUTPUT,
