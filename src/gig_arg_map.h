@@ -108,17 +108,20 @@ struct _GigArgMapEntry
     // If this arg is optional in the Scheme GSubr.
     GigArgPresence presence;
     // This arg's index in g_callable_info_get_arg()
-    gint arg_info_index;
+
+
+    gint i;
     // This arg's position in input args of g_function_info_invoke
-    gint cinvoke_input_index;
+    gint c_input_pos;
     // This arg's position in the output args of g_function_info_invoke
-    gint cinvoke_output_index;
+    gint c_output_pos;
     // This arg's position in the Scheme GSubr
-    gint gsubr_input_index;
+    gint s_input_pos;
     // This arg's position in the return values list
-    gint gsubr_output_index;
+    gint s_output_pos;
     // When non-NULL, this is the entry of the array length argument
     // for this array argument.
+
     GigArgMapEntry *child;
     GigArgMapEntry *parent;
 };
@@ -127,16 +130,17 @@ typedef struct _GigArgMap GigArgMap;
 struct _GigArgMap
 {
     gchar *name;
-    // SCM arguments.
-    gint gsubr_required_input_count;
-    gint gsubr_optional_input_count;
 
-    // SCM return values
-    gint gsubr_output_count;
+    // S arguments.
+    gint s_input_req;
+    gint s_input_opt;
+
+    // S return values
+    gint s_output_len;
 
     // For g_function_invoke call
-    gint cinvoke_input_count;
-    gint cinvoke_output_count;
+    gint c_input_len;
+    gint c_output_len;
 
     // An array of arg_map_entry
     GigArgMapEntry **pdata;
@@ -150,19 +154,16 @@ void gig_amap_free(GigArgMap *am);
 void gig_amap_dump(const GigArgMap *am);
 
 void gig_amap_get_gsubr_args_count(const GigArgMap *am, gint *gsubr_required_input_count,
-                                      gint *gsubr_optional_input_count);
-GigArgMapEntry *gig_amap_get_entry(GigArgMap *am, gint gsubr_input_index);
-GigArgMapEntry *gig_amap_get_output_entry(GigArgMap *am, gint cinvoke_output_index);
-gboolean gig_amap_has_output_array_size_index(GigArgMap *am, gint cinvoke_output_index,
-                                                 gint *cinvoke_output_array_size_index);
-void gig_amap_get_cinvoke_args_count(const GigArgMap *am, gint *cinvoke_input_count,
-                                        gint *cinvoke_output_count);
-gboolean gig_amap_get_cinvoke_indices(const GigArgMap *am, gint gsubr_input_index,
-                                         gint *cinvoke_input_index, gint *cinvoke_output_index);
-gboolean gig_amap_get_cinvoke_array_length_indices(const GigArgMap *am, gint gsubr_input_index,
-                                                      gint *cinvoke_input_index,
-                                                      gint *cinvoke_output_index);
-gboolean gig_amap_has_gsubr_output_index(const GigArgMap *am, gint cinvoke_output_index,
-                                            gint *gsubr_output_index);
+                                   gint *gsubr_optional_input_count);
+GigArgMapEntry *gig_amap_get_entry(GigArgMap *am, gint g_input_pos);
+GigArgMapEntry *gig_amap_get_output_entry(GigArgMap *am, gint c_output_pos);
+gboolean gig_amap_has_output_array_size_index(GigArgMap *am, gint c_output_pos,
+                                              gint *cinvoke_output_array_size_index);
+void gig_amap_get_cinvoke_args_count(const GigArgMap *am, gint *c_input_pos, gint *c_output_pos);
+gboolean gig_amap_get_cinvoke_indices(const GigArgMap *am, gint s_input_pos,
+                                      gint *c_input_pos, gint *c_output_pos);
+gboolean gig_amap_get_cinvoke_array_length_indices(const GigArgMap *am, gint s_input_pos,
+                                                   gint *c_input_pos, gint *c_output_pos);
+gboolean gig_amap_has_s_output_pos(const GigArgMap *am, gint c_output_pos, gint *s_output_pos);
 G_END_DECLS
 #endif

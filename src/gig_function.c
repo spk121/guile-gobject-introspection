@@ -424,7 +424,7 @@ gig_function_invoke(GIFunctionInfo *func_info, GigArgMap *amap, const gchar *nam
         gsize sz = -1;
         if (amap->return_val->array_length_index >= 0) {
             g_assert_cmpint(amap->return_val->array_length_index, <, amap->len);
-            gsize idx = amap->pdata[amap->return_val->array_length_index]->cinvoke_output_index;
+            gsize idx = amap->pdata[amap->return_val->array_length_index]->c_output_pos;
             sz = ((GIArgument *)(cinvoke_output_arg_array->data))[idx].v_size;
         }
 
@@ -547,8 +547,7 @@ object_to_c_arg(GigArgMap *amap, gint i, const gchar *name, SCM obj,
 
         gig_amap_get_cinvoke_array_length_indices(amap, i, &invoke_in, &invoke_out);
         store_argument(invoke_in, invoke_out, inout, &size_arg,
-                       cinvoke_input_arg_array, cinvoke_free_array,
-                       cinvoke_output_arg_array);
+                       cinvoke_input_arg_array, cinvoke_free_array, cinvoke_output_arg_array);
     }
 }
 
@@ -624,20 +623,19 @@ convert_output_args(GIFunctionInfo *func_info, GigArgMap *amap,
                     const gchar *func_name, GArray *out_args)
 {
     SCM output = SCM_EOL;
-    gint gsubr_output_index;
+    gint s_output_pos;
 
-    for (guint cinvoke_output_index = 0; cinvoke_output_index < out_args->len;
-         cinvoke_output_index++) {
-        if (!gig_amap_has_gsubr_output_index(amap, cinvoke_output_index, &gsubr_output_index))
+    for (guint c_output_pos = 0; c_output_pos < out_args->len; c_output_pos++) {
+        if (!gig_amap_has_s_output_pos(amap, c_output_pos, &s_output_pos))
             continue;
 
-        GigArgMapEntry *entry = gig_amap_get_output_entry(amap, cinvoke_output_index);
+        GigArgMapEntry *entry = gig_amap_get_output_entry(amap, c_output_pos);
         GIArgument *ob = (GIArgument *)(out_args->data);
         SCM obj;
         gint size_index;
         gsize size = GIG_ARRAY_SIZE_UNKNOWN;
 
-        if (gig_amap_has_output_array_size_index(amap, cinvoke_output_index, &size_index)) {
+        if (gig_amap_has_output_array_size_index(amap, c_output_pos, &size_index)) {
             if (size_index < 0) {
                 g_assert_not_reached();
             }
@@ -653,8 +651,7 @@ convert_output_args(GIFunctionInfo *func_info, GigArgMap *amap,
             }
         }
 
-        gig_argument_c_to_scm(func_name, cinvoke_output_index, entry, &ob[cinvoke_output_index],
-                              &obj, size);
+        gig_argument_c_to_scm(func_name, c_output_pos, entry, &ob[c_output_pos], &obj, size);
         output = scm_append(scm_list_2(output, scm_list_1(obj)));
     }
     return output;
@@ -675,29 +672,27 @@ rebox_inout_args(GIFunctionInfo *func_info, GigArgMap *amap,
     // stored in the input cinvoke arguments, while the output cinvoke
     // argument for that parameter is unused.
 
-    for (guint cinvoke_input_index = 0; cinvoke_input_index < out_args->len; cinvoke_input_index++) {
-        for (guint arg_info_index = 0; arg_info_index < amap->len; arg_info_index++) {
-            GigArgMapEntry *amap_entry = amap->pdata[arg_info_index];
-            if ((amap_entry->cinvoke_input_index == cinvoke_input_index)
+    for (guint c_input_pos = 0; c_input_pos < out_args->len; c_input_pos++) {
+        for (guint i = 0; i < amap->len; i++) {
+            GigArgMapEntry *amap_entry = amap->pdata[i];
+            if ((amap_entry->c_input_pos == c_input_pos)
                 && (amap_entry->c_direction == GI_DIRECTION_INOUT)) {
                 GIArgument *ob = (GIArgument *)(in_args->data);
                 SCM obj;
                 gsize size = GIG_ARRAY_SIZE_UNKNOWN;
                 if (amap_entry->child != NULL) {
-                    gint size_index = amap_entry->child->arg_info_index;
+                    gint size_index = amap_entry->child->i;
                     g_assert_cmpint(size_index, >=, 0);
 
                     gig_argument_c_to_scm(func_name, size_index, amap->pdata[size_index],
-                                          ob[amap->pdata[size_index]->
-                                             cinvoke_input_index].v_pointer, &obj,
+                                          ob[amap->pdata[size_index]->c_input_pos].v_pointer, &obj,
                                           GIG_ARRAY_SIZE_UNKNOWN);
                     size = scm_to_size_t(obj);
                 }
 
                 if (amap_entry->parent == NULL) {
-                    gig_argument_c_to_scm(func_name, cinvoke_input_index, amap_entry,
-                                          ob[amap_entry->cinvoke_input_index].v_pointer,
-                                          &obj, size);
+                    gig_argument_c_to_scm(func_name, c_input_pos, amap_entry,
+                                          ob[amap_entry->c_input_pos].v_pointer, &obj, size);
                     output = scm_append(scm_list_2(output, scm_list_1(obj)));
                 }
                 break;

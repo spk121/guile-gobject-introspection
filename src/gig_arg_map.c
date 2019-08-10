@@ -51,12 +51,12 @@ static void
 arg_map_entry_initialize(GigArgMapEntry *entry)
 {
     memset(entry, 0, sizeof(GigArgMapEntry));
-    entry->arg_info_index = -1;
+    entry->i = -1;
     entry->array_length_index = -1;
-    entry->cinvoke_input_index = -1;
-    entry->cinvoke_output_index = -1;
-    entry->gsubr_input_index = -1;
-    entry->gsubr_output_index = -1;
+    entry->c_input_pos = -1;
+    entry->c_output_pos = -1;
+    entry->s_input_pos = -1;
+    entry->s_output_pos = -1;
 }
 
 static gboolean
@@ -224,21 +224,21 @@ gig_amap_new(GICallableInfo *function_info)
     GigArgMap *amap = g_new0(GigArgMap, 1);
     amap->name = g_strdup(g_base_info_get_name(function_info));
     GPtrArray *entry_array = g_ptr_array_new();
-    for (gsize arg_info_index = 0; arg_info_index < arg_info_count; arg_info_index++)
+    for (gsize i = 0; i < arg_info_count; i++)
         g_ptr_array_add(entry_array, arg_map_entry_new());
     amap->return_val = arg_map_entry_new();
 
     // may-be-null parameters at the end of the C call can be made
     // optional parameters in the gsubr call.
     gboolean opt_flag = TRUE;
-    for (gint arg_info_index = arg_info_count - 1; arg_info_index >= 0; arg_info_index--) {
-        g_assert_cmpint(arg_info_index, <, entry_array->len);
-        GIArgInfo *arg_info = g_callable_info_get_arg(function_info, arg_info_index);
-        GigArgMapEntry *entry = g_ptr_array_index(entry_array, arg_info_index);
+    for (gint i = arg_info_count - 1; i >= 0; i--) {
+        g_assert_cmpint(i, <, entry_array->len);
+        GIArgInfo *arg_info = g_callable_info_get_arg(function_info, i);
+        GigArgMapEntry *entry = g_ptr_array_index(entry_array, i);
         gig_amap_entry_apply_arg_info(entry, arg_info);
         g_base_info_unref(arg_info);
 
-        entry->arg_info_index = arg_info_index;
+        entry->i = i;
         GIDirection dir = entry->c_direction;
         if (dir == GI_DIRECTION_IN
             || dir == GI_DIRECTION_INOUT
@@ -255,13 +255,13 @@ gig_amap_new(GICallableInfo *function_info)
         }
     }
 
-    gint cinvoke_input_index = 0;
-    gint cinvoke_output_index = 0;
-    gint gsubr_input_index = 0;
-    gint gsubr_output_index = 0;
-    for (gsize arg_info_index = 0; arg_info_index < arg_info_count; arg_info_index++) {
-        g_assert_cmpint(arg_info_index, <, entry_array->len);
-        GigArgMapEntry *entry = g_ptr_array_index(entry_array, arg_info_index);
+    gint c_input_pos = 0;
+    gint c_output_pos = 0;
+    gint s_input_pos = 0;
+    gint s_output_pos = 0;
+    for (gsize i = 0; i < arg_info_count; i++) {
+        g_assert_cmpint(i, <, entry_array->len);
+        GigArgMapEntry *entry = g_ptr_array_index(entry_array, i);
 
         GIDirection dir = entry->c_direction;
         GITypeInfo *type_info = entry->type_info;
@@ -288,20 +288,20 @@ gig_amap_new(GICallableInfo *function_info)
         // call.
         if (dir == GI_DIRECTION_IN) {
             entry->s_direction = GIG_ARG_DIRECTION_INPUT;
-            entry->cinvoke_input_index = cinvoke_input_index++;
+            entry->c_input_pos = c_input_pos++;
         }
         else if (dir == GI_DIRECTION_INOUT) {
             entry->s_direction = GIG_ARG_DIRECTION_INOUT;
-            entry->cinvoke_input_index = cinvoke_input_index++;
-            entry->cinvoke_output_index = cinvoke_output_index++;
+            entry->c_input_pos = c_input_pos++;
+            entry->c_output_pos = c_output_pos++;
         }
         else if (dir == GI_DIRECTION_OUT && is_caller_allocates) {
             entry->s_direction = GIG_ARG_DIRECTION_PREALLOCATED_OUTPUT;
-            entry->cinvoke_output_index = cinvoke_output_index++;
+            entry->c_output_pos = c_output_pos++;
         }
         else {
             entry->s_direction = GIG_ARG_DIRECTION_OUTPUT;
-            entry->cinvoke_output_index = cinvoke_output_index++;
+            entry->c_output_pos = c_output_pos++;
         }
     }
 
@@ -321,23 +321,23 @@ gig_amap_new(GICallableInfo *function_info)
 
     // We now can decide where these arguments appear in the SCM GSubr
     // call.
-    for (gsize arg_info_index = 0; arg_info_index < arg_info_count; arg_info_index++) {
-        g_assert_cmpint(arg_info_index, <, entry_array->len);
-        GigArgMapEntry *entry = g_ptr_array_index(entry_array, arg_info_index);
+    for (gsize i = 0; i < arg_info_count; i++) {
+        g_assert_cmpint(i, <, entry_array->len);
+        GigArgMapEntry *entry = g_ptr_array_index(entry_array, i);
         if (entry->s_direction == GIG_ARG_DIRECTION_INPUT ||
             entry->s_direction == GIG_ARG_DIRECTION_INOUT ||
             entry->s_direction == GIG_ARG_DIRECTION_PREALLOCATED_OUTPUT) {
             if (entry->tuple == GIG_ARG_TUPLE_SINGLETON || entry->tuple == GIG_ARG_TUPLE_ARRAY) {
-                entry->gsubr_input_index = gsubr_input_index++;
+                entry->s_input_pos = s_input_pos++;
                 if (entry->presence == GIG_ARG_PRESENCE_REQUIRED)
-                    amap->gsubr_required_input_count++;
+                    amap->s_input_req++;
                 else if (entry->presence == GIG_ARG_PRESENCE_OPTIONAL)
-                    amap->gsubr_optional_input_count++;
+                    amap->s_input_opt++;
             }
         }
         else if (entry->s_direction == GIG_ARG_DIRECTION_OUTPUT) {
             if (entry->tuple == GIG_ARG_TUPLE_SINGLETON || entry->tuple == GIG_ARG_TUPLE_ARRAY)
-                entry->gsubr_output_index = gsubr_output_index++;
+                entry->s_output_pos = s_output_pos++;
         }
         else
             g_assert_not_reached();
@@ -345,11 +345,10 @@ gig_amap_new(GICallableInfo *function_info)
     }
 
 
-    g_assert_cmpint(amap->gsubr_required_input_count + amap->gsubr_optional_input_count, ==,
-                    gsubr_input_index);
-    amap->gsubr_output_count = gsubr_output_index;
-    amap->cinvoke_input_count = cinvoke_input_index;
-    amap->cinvoke_output_count = cinvoke_output_index;
+    g_assert_cmpint(amap->s_input_req + amap->s_input_opt, ==, s_input_pos);
+    amap->s_output_len = s_output_pos;
+    amap->c_input_len = c_input_pos;
+    amap->c_output_len = c_output_pos;
     amap->len = entry_array->len;
     amap->pdata = (GigArgMapEntry **)(entry_array->pdata);
     g_ptr_array_free(entry_array, FALSE);
@@ -379,29 +378,27 @@ void
 gig_amap_dump(const GigArgMap *amap)
 {
     g_debug("Arg map for '%s'", amap->name);
-    g_debug(" SCM inputs required: %d, optional: %d, outputs: %d", amap->gsubr_required_input_count,
-            amap->gsubr_optional_input_count, amap->gsubr_output_count);
-    g_debug(" C inputs: %d, outputs: %d", amap->cinvoke_input_count,
-            amap->cinvoke_output_count);
+    g_debug(" SCM inputs required: %d, optional: %d, outputs: %d", amap->s_input_req,
+            amap->s_input_opt, amap->s_output_len);
+    g_debug(" C inputs: %d, outputs: %d", amap->c_input_len, amap->c_output_len);
     for (gint i = 0; i < amap->len; i++) {
         const GigArgMapEntry *entry = (GigArgMapEntry *)(amap->pdata[i]);
         GString *s = g_string_new(NULL);
         g_string_append_printf(s, " Arg %d: '%s' %s%s%s",
                                i,
                                entry->name,
-                entry->is_ptr ? "pointer to " : "",
-                entry->is_caller_allocates ? "caller allocated " : "",
-                g_type_tag_to_string(entry->type_tag));
+                               entry->is_ptr ? "pointer to " : "",
+                               entry->is_caller_allocates ? "caller allocated " : "",
+                               g_type_tag_to_string(entry->type_tag));
         if (entry->may_be_null)
             g_string_append_printf(s, " or NULL");
         g_string_append_printf(s, ", %s, %s, %s",
                                dir_strings[entry->s_direction],
-                               tuple_strings[entry->tuple],
-                               presence_strings[entry->presence]);
+                               tuple_strings[entry->tuple], presence_strings[entry->presence]);
         g_string_append_printf(s, ", SCM In %d, Out %d, C In %d, Out %d",
-                entry->gsubr_input_index, entry->gsubr_output_index,
-                entry->cinvoke_input_index, entry->cinvoke_output_index);
-        g_debug("%s",s->str);
+                               entry->s_input_pos, entry->s_output_pos,
+                               entry->c_input_pos, entry->c_output_pos);
+        g_debug("%s", s->str);
         g_string_free(s, TRUE);
     }
     if (amap->return_val->type_tag != GI_TYPE_TAG_VOID) {
@@ -416,9 +413,8 @@ gig_amap_dump(const GigArgMap *amap)
             g_string_append_printf(s, " or NULL");
         g_string_append_printf(s, ", %s, %s, %s",
                                dir_strings[entry->s_direction],
-                               tuple_strings[entry->tuple],
-                               presence_strings[entry->presence]);
-        g_debug("%s",s->str);
+                               tuple_strings[entry->tuple], presence_strings[entry->presence]);
+        g_debug("%s", s->str);
         g_string_free(s, TRUE);
     }
 }
@@ -429,8 +425,8 @@ gig_amap_get_gsubr_args_count(const GigArgMap *amap, gint *required, gint *optio
     g_assert_nonnull(amap);
     g_assert_nonnull(required);
     g_assert_nonnull(optional);
-    *required = amap->gsubr_required_input_count;
-    *optional = amap->gsubr_optional_input_count;
+    *required = amap->s_input_req;
+    *optional = amap->s_input_opt;
 }
 
 GigArgMapEntry *
@@ -439,7 +435,7 @@ gig_amap_get_entry(GigArgMap *amap, gint input)
     g_assert_nonnull(amap);
     gint i = 0;
     while (i < amap->len) {
-        if (amap->pdata[i]->gsubr_input_index == input) {
+        if (amap->pdata[i]->s_input_pos == input) {
             return amap->pdata[i];
         }
         i++;
@@ -454,7 +450,7 @@ gig_amap_get_output_entry(GigArgMap *amap, gint output)
 
     gint i = 0;
     while (i < amap->len) {
-        if (amap->pdata[i]->cinvoke_output_index == output) {
+        if (amap->pdata[i]->c_output_pos == output) {
             return amap->pdata[i];
         }
         i++;
@@ -466,17 +462,17 @@ gig_amap_get_output_entry(GigArgMap *amap, gint output)
 // being its size, this returns TRUE and stores the index of the other
 // argument.
 gboolean
-gig_amap_has_output_array_size_index(GigArgMap *amap, gint cinvoke_output_index,
-                                        gint *cinvoke_output_array_size_index)
+gig_amap_has_output_array_size_index(GigArgMap *amap, gint c_output_pos,
+                                     gint *cinvoke_output_array_size_index)
 {
     g_assert_nonnull(amap);
     g_assert_nonnull(cinvoke_output_array_size_index);
 
     gint i = 0;
     while (i < amap->len) {
-        if (amap->pdata[i]->cinvoke_output_index == cinvoke_output_index) {
+        if (amap->pdata[i]->c_output_pos == c_output_pos) {
             if (amap->pdata[i]->child) {
-                *cinvoke_output_array_size_index = amap->pdata[i]->child->cinvoke_output_index;
+                *cinvoke_output_array_size_index = amap->pdata[i]->child->c_output_pos;
                 return TRUE;
             }
         }
@@ -488,39 +484,38 @@ gig_amap_has_output_array_size_index(GigArgMap *amap, gint cinvoke_output_index,
 // Get the number of required and optional gsubr arguments for this
 // gsubr call.
 void
-gig_amap_get_cinvoke_args_count(const GigArgMap *amap, gint *cinvoke_input_count,
-                                   gint *cinvoke_output_count)
+gig_amap_get_cinvoke_args_count(const GigArgMap *amap, gint *c_input_len, gint *c_output_len)
 {
     g_assert_nonnull(amap);
-    g_assert_nonnull(cinvoke_input_count);
-    g_assert_nonnull(cinvoke_output_count);
+    g_assert_nonnull(c_input_len);
+    g_assert_nonnull(c_output_len);
 
-    *cinvoke_input_count = amap->cinvoke_input_count;
-    *cinvoke_output_count = amap->cinvoke_output_count;
+    *c_input_len = amap->c_input_len;
+    *c_output_len = amap->c_output_len;
 }
 
 // For the gsubr argument at position INDEX, get the input and output
 // index positions for this argument in the C function call.  Return
 // TRUE if this gsubr argument is used in the C function call.
 gboolean
-gig_amap_get_cinvoke_indices(const GigArgMap *amap, gint gsubr_input_index,
-                                gint *cinvoke_input_index, gint *cinvoke_output_index)
+gig_amap_get_cinvoke_indices(const GigArgMap *amap, gint s_input_pos,
+                             gint *c_input_pos, gint *c_output_pos)
 {
     g_assert_nonnull(amap);
-    g_assert_nonnull(cinvoke_input_index);
-    g_assert_nonnull(cinvoke_output_index);
+    g_assert_nonnull(c_input_pos);
+    g_assert_nonnull(c_output_pos);
 
     gint i = 0;
     while (i < amap->len) {
-        if (amap->pdata[i]->gsubr_input_index == gsubr_input_index) {
-            *cinvoke_input_index = amap->pdata[i]->cinvoke_input_index;
-            *cinvoke_output_index = amap->pdata[i]->cinvoke_output_index;
-            return (*cinvoke_input_index >= 0 || *cinvoke_output_index >= 0);
+        if (amap->pdata[i]->s_input_pos == s_input_pos) {
+            *c_input_pos = amap->pdata[i]->c_input_pos;
+            *c_output_pos = amap->pdata[i]->c_output_pos;
+            return (*c_input_pos >= 0 || *c_output_pos >= 0);
         }
         i++;
     }
-    *cinvoke_input_index = -1;
-    *cinvoke_output_index = -1;
+    *c_input_pos = -1;
+    *c_output_pos = -1;
     g_return_val_if_reached(FALSE);
 }
 
@@ -530,48 +525,47 @@ gig_amap_get_cinvoke_indices(const GigArgMap *amap, gint gsubr_input_index,
 // function call.  Return TRUE if this gsubr argument's array size is
 // used in the C function call.
 gboolean
-gig_amap_get_cinvoke_array_length_indices(const GigArgMap *amap, gint gsubr_input_index,
-                                             gint *cinvoke_input_index, gint *cinvoke_output_index)
+gig_amap_get_cinvoke_array_length_indices(const GigArgMap *amap, gint s_input_pos,
+                                          gint *c_input_pos, gint *c_output_pos)
 {
     g_assert_nonnull(amap);
-    g_assert_nonnull(cinvoke_input_index);
-    g_assert_nonnull(cinvoke_output_index);
+    g_assert_nonnull(c_input_pos);
+    g_assert_nonnull(c_output_pos);
 
-    gint arg_info_index = 0;
-    while (arg_info_index < amap->len) {
-        if (amap->pdata[arg_info_index]->gsubr_input_index == gsubr_input_index) {
-            GigArgMapEntry *child = amap->pdata[arg_info_index]->child;
+    gint i = 0;
+    while (i < amap->len) {
+        if (amap->pdata[i]->s_input_pos == s_input_pos) {
+            GigArgMapEntry *child = amap->pdata[i]->child;
             if (child) {
-                *cinvoke_input_index = child->cinvoke_input_index;
-                *cinvoke_output_index = child->cinvoke_output_index;
-                return (*cinvoke_input_index >= 0 || *cinvoke_output_index >= 0);
+                *c_input_pos = child->c_input_pos;
+                *c_output_pos = child->c_output_pos;
+                return (*c_input_pos >= 0 || *c_output_pos >= 0);
             }
             else {
-                *cinvoke_input_index = -1;
-                *cinvoke_output_index = -1;
+                *c_input_pos = -1;
+                *c_output_pos = -1;
                 return FALSE;
             }
         }
-        arg_info_index++;
+        i++;
     }
-    *cinvoke_input_index = -1;
-    *cinvoke_output_index = -1;
+    *c_input_pos = -1;
+    *c_output_pos = -1;
     g_return_val_if_reached(FALSE);
 }
 
 gboolean
-gig_amap_has_gsubr_output_index(const GigArgMap *amap, gint cinvoke_output_index,
-                                   gint *gsubr_output_index)
+gig_amap_has_s_output_pos(const GigArgMap *amap, gint c_output_pos, gint *s_output_pos)
 {
     g_assert_nonnull(amap);
-    g_assert_nonnull(gsubr_output_index);
+    g_assert_nonnull(s_output_pos);
 
     gint i = 0;
     while (i < amap->len) {
-        if (amap->pdata[i]->cinvoke_output_index == cinvoke_output_index) {
-            gint j = amap->pdata[i]->gsubr_output_index;
+        if (amap->pdata[i]->c_output_pos == c_output_pos) {
+            gint j = amap->pdata[i]->s_output_pos;
             if (j >= 0) {
-                *gsubr_output_index = j;
+                *s_output_pos = j;
                 return TRUE;
             }
             else
