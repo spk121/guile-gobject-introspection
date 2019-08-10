@@ -17,23 +17,23 @@
 #include "gig_arg_map.h"
 
 const gchar dir_strings[GIG_ARG_DIRECTION_COUNT][9] = {
-    [GIG_ARG_DIRECTION_VOID] = "VOID",
-    [GIG_ARG_DIRECTION_INPUT] = "INPUT",
-    [GIG_ARG_DIRECTION_INOUT] = "INOUT",
-    [GIG_ARG_DIRECTION_PREALLOCATED_OUTPUT] = "PREALLOC",
-    [GIG_ARG_DIRECTION_OUTPUT] = "OUTPUT"
+    [GIG_ARG_DIRECTION_VOID] = "void",
+    [GIG_ARG_DIRECTION_INPUT] = "input",
+    [GIG_ARG_DIRECTION_INOUT] = "inout",
+    [GIG_ARG_DIRECTION_PREALLOCATED_OUTPUT] = "prealloc",
+    [GIG_ARG_DIRECTION_OUTPUT] = "output"
 };
 
 const gchar tuple_strings[GIG_ARG_TUPLE_COUNT][11] = {
-    [GIG_ARG_TUPLE_SINGLETON] = "SINGLETON",
-    [GIG_ARG_TUPLE_ARRAY] = "ARRAY",
-    [GIG_ARG_TUPLE_ARRAY_SIZE] = "ARRAY_SIZE"
+    [GIG_ARG_TUPLE_SINGLETON] = "singleton",
+    [GIG_ARG_TUPLE_ARRAY] = "array",
+    [GIG_ARG_TUPLE_ARRAY_SIZE] = "array_size"
 };
 
 const gchar presence_strings[GIG_ARG_PRESENCE_COUNT][9] = {
-    [GIG_ARG_PRESENCE_REQUIRED] = "REQUIRED",
-    [GIG_ARG_PRESENCE_OPTIONAL] = "OPTIONAL",
-    [GIG_ARG_PRESENCE_IMPLICIT] = "IMPLICIT"
+    [GIG_ARG_PRESENCE_REQUIRED] = "required",
+    [GIG_ARG_PRESENCE_OPTIONAL] = "optional",
+    [GIG_ARG_PRESENCE_IMPLICIT] = "implicit"
 };
 
 static GigArgMapEntry *arg_map_entry_new(void);
@@ -222,6 +222,7 @@ gig_arg_map_new(GICallableInfo *function_info)
 {
     gsize arg_info_count = g_callable_info_get_n_args(function_info);
     GigArgMap *amap = g_new0(GigArgMap, 1);
+    amap->name = g_strdup(g_base_info_get_name(function_info));
     GPtrArray *entry_array = g_ptr_array_new();
     for (gsize arg_info_index = 0; arg_info_index < arg_info_count; arg_info_index++)
         g_ptr_array_add(entry_array, arg_map_entry_new());
@@ -369,6 +370,7 @@ gig_arg_map_free(GigArgMap *amap)
     free(amap->return_val->name);
     free(amap->return_val);
     free(amap->pdata);
+    free(amap->name);
     amap->pdata = NULL;
     free(amap);
 }
@@ -376,26 +378,48 @@ gig_arg_map_free(GigArgMap *amap)
 void
 gig_arg_map_dump(const GigArgMap *amap)
 {
-    g_debug("Arg map %p", amap);
-    g_debug(" Inputs required: %d, optional %d, Outputs %d", amap->gsubr_required_input_count,
+    g_debug("Arg map for '%s'", amap->name);
+    g_debug(" SCM inputs required: %d, optional: %d, outputs: %d", amap->gsubr_required_input_count,
             amap->gsubr_optional_input_count, amap->gsubr_output_count);
-    g_debug(" C input params: %d, output params %d", amap->cinvoke_input_count,
+    g_debug(" C inputs: %d, outputs: %d", amap->cinvoke_input_count,
             amap->cinvoke_output_count);
     for (gint i = 0; i < amap->len; i++) {
-        GigArgMapEntry *entry = (GigArgMapEntry *)(amap->pdata[i]);
-        g_debug(" Arg %d: '%s'  %s%s%s %s",
-                i,
-                entry->name,
+        const GigArgMapEntry *entry = (GigArgMapEntry *)(amap->pdata[i]);
+        GString *s = g_string_new(NULL);
+        g_string_append_printf(s, " Arg %d: '%s' %s%s%s",
+                               i,
+                               entry->name,
                 entry->is_ptr ? "pointer to " : "",
-                entry->is_caller_allocates ? "caller allocated" : "",
-                g_type_tag_to_string(entry->type_tag), entry->may_be_null ? "or NULL" : "");
-        g_debug(" Arg %d: %10s %10s %10s Index %d, SCM In %d, Out %d, C In %d, Out %d",
-                i,
-                dir_strings[entry->s_direction],
-                tuple_strings[entry->tuple],
-                presence_strings[entry->presence],
-                entry->arg_info_index, entry->gsubr_input_index, entry->gsubr_output_index,
+                entry->is_caller_allocates ? "caller allocated " : "",
+                g_type_tag_to_string(entry->type_tag));
+        if (entry->may_be_null)
+            g_string_append_printf(s, " or NULL");
+        g_string_append_printf(s, ", %s, %s, %s",
+                               dir_strings[entry->s_direction],
+                               tuple_strings[entry->tuple],
+                               presence_strings[entry->presence]);
+        g_string_append_printf(s, ", SCM In %d, Out %d, C In %d, Out %d",
+                entry->gsubr_input_index, entry->gsubr_output_index,
                 entry->cinvoke_input_index, entry->cinvoke_output_index);
+        g_debug("%s",s->str);
+        g_string_free(s, TRUE);
+    }
+    if (amap->return_val->type_tag != GI_TYPE_TAG_VOID) {
+        GigArgMapEntry *entry = amap->return_val;
+        GString *s = g_string_new(NULL);
+        g_string_append_printf(s, " Return: '%s' %s%s%s",
+                               entry->name,
+                               entry->is_ptr ? "pointer to " : "",
+                               entry->is_caller_allocates ? "caller allocated " : "",
+                               g_type_tag_to_string(entry->type_tag));
+        if (entry->may_be_null)
+            g_string_append_printf(s, " or NULL");
+        g_string_append_printf(s, ", %s, %s, %s",
+                               dir_strings[entry->s_direction],
+                               tuple_strings[entry->tuple],
+                               presence_strings[entry->presence]);
+        g_debug("%s",s->str);
+        g_string_free(s, TRUE);
     }
 }
 

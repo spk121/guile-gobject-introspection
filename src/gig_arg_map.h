@@ -126,6 +126,7 @@ struct _GigArgMapEntry
 typedef struct _GigArgMap GigArgMap;
 struct _GigArgMap
 {
+    gchar *name;
     // SCM arguments.
     gint gsubr_required_input_count;
     gint gsubr_optional_input_count;
