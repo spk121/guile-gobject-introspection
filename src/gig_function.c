@@ -422,13 +422,13 @@ gig_function_invoke(GIFunctionInfo *func_info, GigArgMap *amap, const gchar *nam
     if (ok) {
         SCM s_return;
         gsize sz = -1;
-        if (amap->return_val->array_length_index >= 0) {
-            g_assert_cmpint(amap->return_val->array_length_index, <, amap->len);
-            gsize idx = amap->pdata[amap->return_val->array_length_index]->c_output_pos;
+        if (amap->return_val.array_length_index >= 0) {
+            g_assert_cmpint(amap->return_val.array_length_index, <, amap->len);
+            gsize idx = amap->pdata[amap->return_val.array_length_index].c_output_pos;
             sz = ((GIArgument *)(cinvoke_output_arg_array->data))[idx].v_size;
         }
 
-        gig_argument_c_to_scm(name, -1, amap->return_val, &return_arg, &s_return, sz);
+        gig_argument_c_to_scm(name, -1, &amap->return_val, &return_arg, &s_return, sz);
         if (scm_is_eq(s_return, SCM_UNSPECIFIED))
             output = SCM_EOL;
         else
@@ -538,7 +538,7 @@ object_to_c_arg(GigArgMap *amap, gint i, const gchar *name, SCM obj,
     // array size as well.
     gig_amap_get_cinvoke_array_length_indices(amap, i, &invoke_in, &invoke_out);
     if (invoke_in >= 0 || invoke_out >= 0) {
-        GigArgMapEntry *size_entry = amap->pdata[entry->array_length_index];
+        GigArgMapEntry *size_entry = &amap->pdata[entry->array_length_index];
         GIArgument size_arg;
         gsize dummy_size;
 
@@ -674,7 +674,7 @@ rebox_inout_args(GIFunctionInfo *func_info, GigArgMap *amap,
 
     for (guint c_input_pos = 0; c_input_pos < out_args->len; c_input_pos++) {
         for (guint i = 0; i < amap->len; i++) {
-            GigArgMapEntry *amap_entry = amap->pdata[i];
+            GigArgMapEntry *amap_entry = &amap->pdata[i];
             if ((amap_entry->c_input_pos == c_input_pos)
                 && (amap_entry->c_direction == GI_DIRECTION_INOUT)) {
                 GIArgument *ob = (GIArgument *)(in_args->data);
@@ -684,8 +684,8 @@ rebox_inout_args(GIFunctionInfo *func_info, GigArgMap *amap,
                     gint size_index = amap_entry->child->i;
                     g_assert_cmpint(size_index, >=, 0);
 
-                    gig_argument_c_to_scm(func_name, size_index, amap->pdata[size_index],
-                                          ob[amap->pdata[size_index]->c_input_pos].v_pointer, &obj,
+                    gig_argument_c_to_scm(func_name, size_index, &amap->pdata[size_index],
+                                          ob[amap->pdata[size_index].c_input_pos].v_pointer, &obj,
                                           GIG_ARRAY_SIZE_UNKNOWN);
                     size = scm_to_size_t(obj);
                 }

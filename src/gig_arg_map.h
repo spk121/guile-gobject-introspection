@@ -143,10 +143,10 @@ struct _GigArgMap
     gint c_output_len;
 
     // An array of arg_map_entry
-    GigArgMapEntry **pdata;
+    GigArgMapEntry *pdata;
     gint len;
 
-    GigArgMapEntry *return_val;
+    GigArgMapEntry return_val;
 };
 
 GigArgMap *gig_amap_new(GICallableInfo *function_info);

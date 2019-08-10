@@ -37,18 +37,18 @@ const gchar presence_strings[GIG_ARG_PRESENCE_COUNT][9] = {
 };
 
 static GigArgMapEntry *arg_map_entry_new(void);
-static void arg_map_entry_initialize(GigArgMapEntry *map);
+static void arg_map_entry_init(GigArgMapEntry *map);
 
 static GigArgMapEntry *
 arg_map_entry_new()
 {
     GigArgMapEntry *entry = g_new(GigArgMapEntry, 1);
-    arg_map_entry_initialize(entry);
+    arg_map_entry_init(entry);
     return entry;
 }
 
 static void
-arg_map_entry_initialize(GigArgMapEntry *entry)
+arg_map_entry_init(GigArgMapEntry *entry)
 {
     memset(entry, 0, sizeof(GigArgMapEntry));
     entry->i = -1;
@@ -226,7 +226,7 @@ gig_amap_new(GICallableInfo *function_info)
     GPtrArray *entry_array = g_ptr_array_new();
     for (gsize i = 0; i < arg_info_count; i++)
         g_ptr_array_add(entry_array, arg_map_entry_new());
-    amap->return_val = arg_map_entry_new();
+    arg_map_entry_init(&amap->return_val);
 
     // may-be-null parameters at the end of the C call can be made
     // optional parameters in the gsubr call.
@@ -305,17 +305,17 @@ gig_amap_new(GICallableInfo *function_info)
         }
     }
 
-    amap->return_val = arg_map_entry_new();
-    gig_amap_entry_apply_callable_info(amap->return_val, function_info);
-    if (amap->return_val->type_tag == GI_TYPE_TAG_ARRAY) {
-        fill_array_info(amap->return_val);
-        if (amap->return_val->array_length_index >= 0) {
-            amap->return_val->tuple = GIG_ARG_TUPLE_ARRAY;
-            amap->return_val->child =
-                g_ptr_array_index(entry_array, amap->return_val->array_length_index);
-            amap->return_val->child->tuple = GIG_ARG_TUPLE_ARRAY_SIZE;
-            amap->return_val->child->presence = GIG_ARG_PRESENCE_IMPLICIT;
-            amap->return_val->child->parent = amap->return_val;
+    arg_map_entry_init(&amap->return_val);
+    gig_amap_entry_apply_callable_info(&amap->return_val, function_info);
+    if (amap->return_val.type_tag == GI_TYPE_TAG_ARRAY) {
+        fill_array_info(&amap->return_val);
+        if (amap->return_val.array_length_index >= 0) {
+            amap->return_val.tuple = GIG_ARG_TUPLE_ARRAY;
+            amap->return_val.child =
+                g_ptr_array_index(entry_array, amap->return_val.array_length_index);
+            amap->return_val.child->tuple = GIG_ARG_TUPLE_ARRAY_SIZE;
+            amap->return_val.child->presence = GIG_ARG_PRESENCE_IMPLICIT;
+            amap->return_val.child->parent = &amap->return_val;
         }
     }
 
@@ -350,7 +350,11 @@ gig_amap_new(GICallableInfo *function_info)
     amap->c_input_len = c_input_pos;
     amap->c_output_len = c_output_pos;
     amap->len = entry_array->len;
-    amap->pdata = (GigArgMapEntry **)(entry_array->pdata);
+    amap->pdata = g_new0(GigArgMapEntry, entry_array->len);
+    for (gint i = 0; i < entry_array->len; i++) {
+        GigArgMapEntry *entry = g_ptr_array_index(entry_array, i);
+        memmove(&amap->pdata[i], entry, sizeof(GigArgMapEntry));
+    }
     g_ptr_array_free(entry_array, FALSE);
 
     return amap;
@@ -360,14 +364,11 @@ void
 gig_amap_free(GigArgMap *amap)
 {
     for (gint i = 0; i < amap->len; i++) {
-        g_base_info_unref(amap->pdata[i]->type_info);
-        free(amap->pdata[i]->name);
-        free(amap->pdata[i]);
-        amap->pdata[i] = NULL;
+        g_base_info_unref(amap->pdata[i].type_info);
+        free(amap->pdata[i].name);
     }
-    g_base_info_unref(amap->return_val->type_info);
-    free(amap->return_val->name);
-    free(amap->return_val);
+    g_base_info_unref(amap->return_val.type_info);
+    free(amap->return_val.name);
     free(amap->pdata);
     free(amap->name);
     amap->pdata = NULL;
@@ -382,7 +383,7 @@ gig_amap_dump(const GigArgMap *amap)
             amap->s_input_opt, amap->s_output_len);
     g_debug(" C inputs: %d, outputs: %d", amap->c_input_len, amap->c_output_len);
     for (gint i = 0; i < amap->len; i++) {
-        const GigArgMapEntry *entry = (GigArgMapEntry *)(amap->pdata[i]);
+        const GigArgMapEntry *entry = &amap->pdata[i];
         GString *s = g_string_new(NULL);
         g_string_append_printf(s, " Arg %d: '%s' %s%s%s",
                                i,
@@ -401,8 +402,8 @@ gig_amap_dump(const GigArgMap *amap)
         g_debug("%s", s->str);
         g_string_free(s, TRUE);
     }
-    if (amap->return_val->type_tag != GI_TYPE_TAG_VOID) {
-        GigArgMapEntry *entry = amap->return_val;
+    if (amap->return_val.type_tag != GI_TYPE_TAG_VOID) {
+        GigArgMapEntry *entry = &amap->return_val;
         GString *s = g_string_new(NULL);
         g_string_append_printf(s, " Return: '%s' %s%s%s",
                                entry->name,
@@ -435,8 +436,8 @@ gig_amap_get_entry(GigArgMap *amap, gint input)
     g_assert_nonnull(amap);
     gint i = 0;
     while (i < amap->len) {
-        if (amap->pdata[i]->s_input_pos == input) {
-            return amap->pdata[i];
+        if (amap->pdata[i].s_input_pos == input) {
+            return &amap->pdata[i];
         }
         i++;
     }
@@ -450,8 +451,8 @@ gig_amap_get_output_entry(GigArgMap *amap, gint output)
 
     gint i = 0;
     while (i < amap->len) {
-        if (amap->pdata[i]->c_output_pos == output) {
-            return amap->pdata[i];
+        if (amap->pdata[i].c_output_pos == output) {
+            return &amap->pdata[i];
         }
         i++;
     }
@@ -470,9 +471,9 @@ gig_amap_has_output_array_size_index(GigArgMap *amap, gint c_output_pos,
 
     gint i = 0;
     while (i < amap->len) {
-        if (amap->pdata[i]->c_output_pos == c_output_pos) {
-            if (amap->pdata[i]->child) {
-                *cinvoke_output_array_size_index = amap->pdata[i]->child->c_output_pos;
+        if (amap->pdata[i].c_output_pos == c_output_pos) {
+            if (amap->pdata[i].child) {
+                *cinvoke_output_array_size_index = amap->pdata[i].child->c_output_pos;
                 return TRUE;
             }
         }
@@ -507,9 +508,9 @@ gig_amap_get_cinvoke_indices(const GigArgMap *amap, gint s_input_pos,
 
     gint i = 0;
     while (i < amap->len) {
-        if (amap->pdata[i]->s_input_pos == s_input_pos) {
-            *c_input_pos = amap->pdata[i]->c_input_pos;
-            *c_output_pos = amap->pdata[i]->c_output_pos;
+        if (amap->pdata[i].s_input_pos == s_input_pos) {
+            *c_input_pos = amap->pdata[i].c_input_pos;
+            *c_output_pos = amap->pdata[i].c_output_pos;
             return (*c_input_pos >= 0 || *c_output_pos >= 0);
         }
         i++;
@@ -534,8 +535,8 @@ gig_amap_get_cinvoke_array_length_indices(const GigArgMap *amap, gint s_input_po
 
     gint i = 0;
     while (i < amap->len) {
-        if (amap->pdata[i]->s_input_pos == s_input_pos) {
-            GigArgMapEntry *child = amap->pdata[i]->child;
+        if (amap->pdata[i].s_input_pos == s_input_pos) {
+            GigArgMapEntry *child = amap->pdata[i].child;
             if (child) {
                 *c_input_pos = child->c_input_pos;
                 *c_output_pos = child->c_output_pos;
@@ -562,8 +563,8 @@ gig_amap_has_s_output_pos(const GigArgMap *amap, gint c_output_pos, gint *s_outp
 
     gint i = 0;
     while (i < amap->len) {
-        if (amap->pdata[i]->c_output_pos == c_output_pos) {
-            gint j = amap->pdata[i]->s_output_pos;
+        if (amap->pdata[i].c_output_pos == c_output_pos) {
+            gint j = amap->pdata[i].s_output_pos;
             if (j >= 0) {
                 *s_output_pos = j;
                 return TRUE;
