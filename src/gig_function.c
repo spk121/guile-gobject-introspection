@@ -196,7 +196,7 @@ proc4signal(GISignalInfo *info, const gchar *name, SCM self_type, int *req, int 
     GigArgMap *amap;
 
     amap = scm_dynwind_or_bust("%proc4signal", gig_amap_new(info));
-    gig_amap_get_gsubr_args_count(amap, req, opt);
+    gig_amap_s_input_count(amap, req, opt);
     (*req)++;
 
     make_formals(info, amap, *req + *opt, self_type, formals, specializers);
@@ -234,7 +234,7 @@ check_gsubr_cache(GICallableInfo *function_info, SCM self_type, gint *required_i
     if (gfn == NULL)
         return NULL;
 
-    gig_amap_get_gsubr_args_count(gfn->amap, required_input_count, optional_input_count);
+    gig_amap_s_input_count(gfn->amap, required_input_count, optional_input_count);
 
     if (g_callable_info_is_method(gfn->function_info))
         (*required_input_count)++;
@@ -266,7 +266,7 @@ make_formals(GICallableInfo *callable,
 
     for (gint i = 0; i < n_inputs;
          i++, i_formal = scm_cdr(i_formal), i_specializer = scm_cdr(i_specializer)) {
-        GigArgMapEntry *entry = gig_amap_get_entry(argmap, i);
+        GigArgMapEntry *entry = gig_amap_get_input_entry_by_s(argmap, i);
         gchar *formal = scm_dynwind_or_bust("%make-formals",
                                             gig_gname_to_scm_name(entry->name));
         scm_set_car_x(i_formal, scm_from_utf8_symbol(formal));
@@ -301,7 +301,7 @@ create_gsubr(GIFunctionInfo *function_info, const gchar *name, SCM self_type,
     gfn->name = g_strdup(name);
     g_base_info_ref(function_info);
 
-    gig_amap_get_gsubr_args_count(gfn->amap, required_input_count, optional_input_count);
+    gig_amap_s_input_count(gfn->amap, required_input_count, optional_input_count);
 
     if (g_callable_info_is_method(gfn->function_info))
         (*required_input_count)++;
@@ -511,7 +511,7 @@ function_binding(ffi_cif *cif, gpointer ret, gpointer *ffi_args, gpointer user_d
 }
 
 static void
-object_to_c_arg(GigArgMap *amap, gint i, const gchar *name, SCM obj,
+object_to_c_arg(GigArgMap *amap, gint s, const gchar *name, SCM obj,
                 GArray *cinvoke_input_arg_array, GPtrArray *cinvoke_free_array,
                 GArray *cinvoke_output_arg_array)
 {
@@ -519,34 +519,33 @@ object_to_c_arg(GigArgMap *amap, gint i, const gchar *name, SCM obj,
     GIArgument arg;
     GigArgMapEntry *entry;
     gsize size;
-    gint invoke_in, invoke_out;
+    gint c_invoke_in, c_invoke_out;
     gboolean inout;
 
-    entry = gig_amap_get_entry(amap, i);
-    gig_argument_scm_to_c(name, i, entry, obj, cinvoke_free_array, &arg, &size);
+    entry = gig_amap_get_input_entry_by_s(amap, s);
+    gig_argument_scm_to_c(name, s, entry, obj, cinvoke_free_array, &arg, &size);
 
     // Store the converted argument.
-    gig_amap_get_cinvoke_indices(amap, i, &invoke_in, &invoke_out);
+    gig_amap_input_s_2_inout_c(amap, s, &c_invoke_in, &c_invoke_out);
 
     // Input/Output arguments have an extra implied level of
     // indirection.
-    inout = invoke_in >= 0 && invoke_out >= 0;
-    store_argument(invoke_in, invoke_out, inout, &arg,
+    inout = c_invoke_in >= 0 && c_invoke_out >= 0;
+    store_argument(c_invoke_in, c_invoke_out, inout, &arg,
                    cinvoke_input_arg_array, cinvoke_free_array, cinvoke_output_arg_array);
 
     // If this argument is an array with an associated size, store the
     // array size as well.
-    gig_amap_get_cinvoke_array_length_indices(amap, i, &invoke_in, &invoke_out);
-    if (invoke_in >= 0 || invoke_out >= 0) {
+    gig_amap_input_s_2_child_inout_c(amap, s, &c_invoke_in, &c_invoke_out);
+    if (c_invoke_in >= 0 || c_invoke_out >= 0) {
         GigArgMapEntry *size_entry = &amap->pdata[entry->array_length_index];
         GIArgument size_arg;
         gsize dummy_size;
 
-        gig_argument_scm_to_c(name, i, size_entry, scm_from_size_t(size), cinvoke_free_array,
+        gig_argument_scm_to_c(name, s, size_entry, scm_from_size_t(size), cinvoke_free_array,
                               &size_arg, &dummy_size);
 
-        gig_amap_get_cinvoke_array_length_indices(amap, i, &invoke_in, &invoke_out);
-        store_argument(invoke_in, invoke_out, inout, &size_arg,
+        store_argument(c_invoke_in, c_invoke_out, inout, &size_arg,
                        cinvoke_input_arg_array, cinvoke_free_array, cinvoke_output_arg_array);
     }
 }
@@ -599,12 +598,12 @@ object_list_to_c_args(GIFunctionInfo *func_info,
         args_count = 0;
     else
         args_count = scm_to_int(scm_length(s_args));
-    gig_amap_get_gsubr_args_count(amap, &required, &optional);
+    gig_amap_s_input_count(amap, &required, &optional);
     if (args_count < required || args_count > required + optional)
         scm_error_num_args_subr(subr);
 
     gint input_len, output_len;
-    gig_amap_get_cinvoke_args_count(amap, &input_len, &output_len);
+    gig_amap_c_count(amap, &input_len, &output_len);
 
     g_array_set_size(cinvoke_input_arg_array, input_len);
     g_array_set_size(cinvoke_output_arg_array, output_len);
@@ -626,16 +625,16 @@ convert_output_args(GIFunctionInfo *func_info, GigArgMap *amap,
     gint s_output_pos;
 
     for (guint c_output_pos = 0; c_output_pos < out_args->len; c_output_pos++) {
-        if (!gig_amap_has_s_output_pos(amap, c_output_pos, &s_output_pos))
+        if (!gig_amap_output_c2s(amap, c_output_pos, &s_output_pos))
             continue;
 
-        GigArgMapEntry *entry = gig_amap_get_output_entry(amap, c_output_pos);
+        GigArgMapEntry *entry = gig_amap_get_output_entry_by_c(amap, c_output_pos);
         GIArgument *ob = (GIArgument *)(out_args->data);
         SCM obj;
         gint size_index;
         gsize size = GIG_ARRAY_SIZE_UNKNOWN;
 
-        if (gig_amap_has_output_array_size_index(amap, c_output_pos, &size_index)) {
+        if (gig_amap_output_child_c(amap, c_output_pos, &size_index)) {
             if (size_index < 0) {
                 g_assert_not_reached();
             }
@@ -644,7 +643,7 @@ convert_output_args(GIFunctionInfo *func_info, GigArgMap *amap,
             else {
                 // We haven't processed the size argument yet, so
                 // let's to that now.
-                GigArgMapEntry *size_entry = gig_amap_get_output_entry(amap, size_index);
+                GigArgMapEntry *size_entry = gig_amap_get_output_entry_by_c(amap, size_index);
                 gig_argument_c_to_scm(func_name, size_index, size_entry, &ob[size_index],
                                       &obj, -1);
                 size = scm_to_int(obj);

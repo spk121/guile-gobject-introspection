@@ -153,17 +153,34 @@ GigArgMap *gig_amap_new(GICallableInfo *function_info);
 void gig_amap_free(GigArgMap *am);
 void gig_amap_dump(const GigArgMap *am);
 
-void gig_amap_get_gsubr_args_count(const GigArgMap *am, gint *gsubr_required_input_count,
-                                   gint *gsubr_optional_input_count);
-GigArgMapEntry *gig_amap_get_entry(GigArgMap *am, gint g_input_pos);
-GigArgMapEntry *gig_amap_get_output_entry(GigArgMap *am, gint c_output_pos);
-gboolean gig_amap_has_output_array_size_index(GigArgMap *am, gint c_output_pos,
-                                              gint *cinvoke_output_array_size_index);
-void gig_amap_get_cinvoke_args_count(const GigArgMap *am, gint *c_input_pos, gint *c_output_pos);
-gboolean gig_amap_get_cinvoke_indices(const GigArgMap *am, gint s_input_pos,
-                                      gint *c_input_pos, gint *c_output_pos);
+void gig_amap_s_input_count(const GigArgMap *amap, gint *required, gint *optional);
+GigArgMapEntry *gig_amap_get_input_entry_by_s(GigArgMap *am, gint spos);
+GigArgMapEntry *gig_amap_get_output_entry_by_c(GigArgMap *am, gint cpos);
+gboolean gig_amap_output_child_c(GigArgMap *am, gint c_output_pos,
+                                 gint *cinvoke_output_array_size_index);
+void gig_amap_c_count(const GigArgMap *am, gint *c_input_pos, gint *c_output_pos);
+gboolean gig_amap_input_s_2_inout_c(const GigArgMap *amap, gint s_input, gint *c_input,
+                                    gint *c_output);
+gboolean gig_amap_input_s_2_child_inout_c(const GigArgMap *amap, gint s_input, gint *c_input,
+                                          gint *c_output);
 gboolean gig_amap_get_cinvoke_array_length_indices(const GigArgMap *am, gint s_input_pos,
                                                    gint *c_input_pos, gint *c_output_pos);
-gboolean gig_amap_has_s_output_pos(const GigArgMap *am, gint c_output_pos, gint *s_output_pos);
+gboolean gig_amap_input_i2c(const GigArgMap *amap, gint i, gint *c);
+gboolean gig_amap_input_i2s(const GigArgMap *amap, gint i, gint *s);
+gboolean gig_amap_input_c2i(const GigArgMap *amap, gint c, gint *i);
+gboolean gig_amap_input_s2i(const GigArgMap *amap, gint s, gint *i);
+gboolean gig_amap_input_c2s(const GigArgMap *amap, gint c, gint *s);
+gboolean gig_amap_input_s2c(const GigArgMap *amap, gint s, gint *c);
+
+gboolean gig_amap_output_i2c(const GigArgMap *amap, gint i, gint *c);
+gboolean gig_amap_output_i2s(const GigArgMap *amap, gint i, gint *s);
+gboolean gig_amap_output_c2i(const GigArgMap *amap, gint c, gint *i);
+gboolean gig_amap_output_s2i(const GigArgMap *amap, gint s, gint *i);
+gboolean gig_amap_output_c2s(const GigArgMap *amap, gint c, gint *s);
+gboolean gig_amap_output_s2c(const GigArgMap *amap, gint s, gint *c);
+
+gboolean gig_amap_child_i(const GigArgMap *amap, gint i, gint *ichild);
+gboolean gig_amap_return_child_i(const GigArgMap *amap, gint *ichild);
+
 G_END_DECLS
 #endif
