@@ -41,8 +41,8 @@
   (cdr '(%
          namespace
          ;; introspected types
-         class record union interface
-         function method
+         class record union interface enumeration bitfield
+         function method member
          ;; leaves
          doc scheme)))
 
@@ -307,6 +307,7 @@
   (letrec ((%scheme (xpath:sxpath `(scheme)))
            (%section (xpath:sxpath `(section)))
            (%simplesect (xpath:sxpath `(simplesect)))
+           (%c-id (xpath:sxpath `(@ c:identifier *text*)))
 
            (\n\n (make-regexp "\n\n"))
 
@@ -387,8 +388,12 @@
         (class . ,section)
         (interface . ,section)
         (union . ,section)
+        (enumeration . ,section)
+        (bitfield . ,section)
+
         (method . ,simplesect)
         (function . ,simplesect)
+        (member . ,simplesect)
 
         (procedure
          .
@@ -411,6 +416,12 @@
                    (append (%long-name node)
                            (%name node))))))))
         (type . ,title)
+        (symbol . ,(lambda (tag . kids)
+                     (let ((c-id (car? (%c-id (cons tag kids)))))
+                       (cons (apply title tag kids)
+                             (if c-id
+                                 `((subtitle "alias " (code ,c-id)))
+                                 '())))))
 
         (*text* . ,(lambda (tag txt)
                      txt))
