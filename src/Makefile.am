@@ -21,6 +21,8 @@ libguile_gi_la_SOURCES = \
  gi_callable_info.h \
  gig_argument.c \
  gig_argument.h \
+ gig_data_type.c \
+ gig_data_type.h \
  gig_object.c \
  gig_object.h \
  gig_value.c \

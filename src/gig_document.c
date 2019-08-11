@@ -105,7 +105,7 @@ do_document(GIBaseInfo *info, const gchar *namespace)
             GigArgMapEntry *entry = gig_amap_get_input_entry_by_s(arg_map, i);
             document_arg_entry("argument", entry);
         }
-        if (arg_map->return_val.type_tag != GI_TYPE_TAG_VOID)
+        if (arg_map->return_val.meta.type_tag != GI_TYPE_TAG_VOID)
             document_arg_entry("return", &arg_map->return_val);
 
         for (gint i = 0; i < out; i++) {

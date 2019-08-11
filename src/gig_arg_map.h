@@ -18,6 +18,7 @@
 
 #include <glib.h>
 #include <girepository.h>
+#include "gig_data_type.h"
 
 // *INDENT-OFF*
 G_BEGIN_DECLS
@@ -60,42 +61,7 @@ typedef struct _GigArgMapEntry GigArgMapEntry;
 struct _GigArgMapEntry
 {
     gchar *name;
-
-    ////////////////////////////////////////////////////////////////
-    // This block is similar to GIArgInfo, except it is generic for
-    // both arguments and return types
-    GITypeInfo *type_info;
-    GITypeTag type_tag;
-    gboolean is_ptr;
-    // The direction of the C argument, which may differ from the SCM
-    GIDirection c_direction;
-    // Nothing, container, or everything
-    GITransfer transfer;
-    // For C 'in' values, whether NULL is a valid value.  For 'out'
-    // values, whether NULL may be returned.
-    gboolean may_be_null;
-    // For C 'out' values, whether this argument is allocated by the
-    // caller.
-    gboolean is_caller_allocates;
-
-    ////////////////////////////////////////////////////////////////
-    // This block is additional data that is valid only for arrays
-
-    // The array itself
-    GIArrayType array_type;
-    gsize array_fixed_size;
-    gint array_length_index;
-    gboolean array_is_zero_terminated;
-
-    // The elements of the array
-    GITransfer item_transfer;
-    GITypeTag item_type_tag;
-    gboolean item_is_ptr;
-    gsize item_size;
-
-    // The objects held by elements of the array
-    GIInfoType referenced_base_type;
-    GType referenced_object_type;
+    GigTypeMeta meta;
 
     ////////////////////////////////////////////////////////////////
     // This block is derived information about how to map

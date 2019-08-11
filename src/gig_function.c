@@ -272,11 +272,11 @@ make_formals(GICallableInfo *callable,
         scm_set_car_x(i_formal, scm_from_utf8_symbol(formal));
         // don't force types on nullable input, as #f can also be used to represent
         // NULL.
-        if (entry->may_be_null)
+        if (entry->meta.may_be_null)
             continue;
 
-        if (entry->type_tag == GI_TYPE_TAG_INTERFACE) {
-            GIBaseInfo *iface = g_type_info_get_interface(entry->type_info);
+        if (entry->meta.type_tag == GI_TYPE_TAG_INTERFACE) {
+            GIBaseInfo *iface = g_type_info_get_interface(entry->meta.type_info);
             if (!GI_IS_REGISTERED_TYPE_INFO(iface))
                 continue;
             GType gtype = g_registered_type_info_get_g_type((GIRegisteredTypeInfo *) iface);
@@ -422,9 +422,9 @@ gig_function_invoke(GIFunctionInfo *func_info, GigArgMap *amap, const gchar *nam
     if (ok) {
         SCM s_return;
         gsize sz = -1;
-        if (amap->return_val.array_length_index >= 0) {
-            g_assert_cmpint(amap->return_val.array_length_index, <, amap->len);
-            gsize idx = amap->pdata[amap->return_val.array_length_index].c_output_pos;
+        if (amap->return_val.meta.array_length_index >= 0) {
+            g_assert_cmpint(amap->return_val.meta.array_length_index, <, amap->len);
+            gsize idx = amap->pdata[amap->return_val.meta.array_length_index].c_output_pos;
             sz = ((GIArgument *)(cinvoke_output_arg_array->data))[idx].v_size;
         }
 
@@ -549,7 +549,7 @@ object_to_c_arg(GigArgMap *amap, gint s, const gchar *name, SCM obj,
     if (!is_out)
         c_invoke_out = -1;
     if (c_invoke_in >= 0 || c_invoke_out >= 0) {
-        GigArgMapEntry *size_entry = &amap->pdata[entry->array_length_index];
+        GigArgMapEntry *size_entry = &amap->pdata[entry->meta.array_length_index];
         GIArgument size_arg;
         gsize dummy_size;
 
@@ -678,7 +678,7 @@ rebox_inout_args(GIFunctionInfo *func_info, GigArgMap *amap,
         for (guint i = 0; i < amap->len; i++) {
             GigArgMapEntry *amap_entry = &amap->pdata[i];
             if ((amap_entry->c_input_pos == c_input_pos)
-                && (amap_entry->c_direction == GI_DIRECTION_INOUT)) {
+                && (amap_entry->meta.c_direction == GI_DIRECTION_INOUT)) {
                 GIArgument *ob = (GIArgument *)(in_args->data);
                 SCM obj;
                 gsize size = GIG_ARRAY_SIZE_UNKNOWN;
