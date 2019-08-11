@@ -222,19 +222,19 @@ gig_amap_new(GICallableInfo *function_info)
 {
     gsize arg_info_count = g_callable_info_get_n_args(function_info);
     GigArgMap *amap = g_new0(GigArgMap, 1);
+    amap->pdata = g_new0(GigArgMapEntry, arg_info_count);
+    amap->len = arg_info_count;
     amap->name = g_strdup(g_base_info_get_name(function_info));
-    GPtrArray *entry_array = g_ptr_array_new();
     for (gsize i = 0; i < arg_info_count; i++)
-        g_ptr_array_add(entry_array, arg_map_entry_new());
+        arg_map_entry_init(&amap->pdata[i]);
     arg_map_entry_init(&amap->return_val);
 
     // may-be-null parameters at the end of the C call can be made
     // optional parameters in the gsubr call.
     gboolean opt_flag = TRUE;
     for (gint i = arg_info_count - 1; i >= 0; i--) {
-        g_assert_cmpint(i, <, entry_array->len);
         GIArgInfo *arg_info = g_callable_info_get_arg(function_info, i);
-        GigArgMapEntry *entry = g_ptr_array_index(entry_array, i);
+        GigArgMapEntry *entry = &amap->pdata[i];
         gig_amap_entry_apply_arg_info(entry, arg_info);
         g_base_info_unref(arg_info);
 
@@ -260,8 +260,7 @@ gig_amap_new(GICallableInfo *function_info)
     gint s_input_pos = 0;
     gint s_output_pos = 0;
     for (gsize i = 0; i < arg_info_count; i++) {
-        g_assert_cmpint(i, <, entry_array->len);
-        GigArgMapEntry *entry = g_ptr_array_index(entry_array, i);
+        GigArgMapEntry *entry = &amap->pdata[i];
 
         GIDirection dir = entry->c_direction;
         GITypeInfo *type_info = entry->type_info;
@@ -275,7 +274,7 @@ gig_amap_new(GICallableInfo *function_info)
             // arguments: a C array pointer and a C size parameter.
             if (entry->array_length_index >= 0) {
                 entry->tuple = GIG_ARG_TUPLE_ARRAY;
-                entry->child = g_ptr_array_index(entry_array, entry->array_length_index);
+                entry->child = &amap->pdata[entry->array_length_index];
                 entry->child->tuple = GIG_ARG_TUPLE_ARRAY_SIZE;
                 entry->child->presence = GIG_ARG_PRESENCE_IMPLICIT;
                 entry->child->parent = entry;
@@ -311,8 +310,7 @@ gig_amap_new(GICallableInfo *function_info)
         fill_array_info(&amap->return_val);
         if (amap->return_val.array_length_index >= 0) {
             amap->return_val.tuple = GIG_ARG_TUPLE_ARRAY;
-            amap->return_val.child =
-                g_ptr_array_index(entry_array, amap->return_val.array_length_index);
+            amap->return_val.child = &amap->pdata[amap->return_val.array_length_index];
             amap->return_val.child->tuple = GIG_ARG_TUPLE_ARRAY_SIZE;
             amap->return_val.child->presence = GIG_ARG_PRESENCE_IMPLICIT;
             amap->return_val.child->parent = &amap->return_val;
@@ -322,8 +320,7 @@ gig_amap_new(GICallableInfo *function_info)
     // We now can decide where these arguments appear in the SCM GSubr
     // call.
     for (gsize i = 0; i < arg_info_count; i++) {
-        g_assert_cmpint(i, <, entry_array->len);
-        GigArgMapEntry *entry = g_ptr_array_index(entry_array, i);
+        GigArgMapEntry *entry = &amap->pdata[i];
         if (entry->s_direction == GIG_ARG_DIRECTION_INPUT ||
             entry->s_direction == GIG_ARG_DIRECTION_INOUT ||
             entry->s_direction == GIG_ARG_DIRECTION_PREALLOCATED_OUTPUT) {
@@ -349,13 +346,6 @@ gig_amap_new(GICallableInfo *function_info)
     amap->s_output_len = s_output_pos;
     amap->c_input_len = c_input_pos;
     amap->c_output_len = c_output_pos;
-    amap->len = entry_array->len;
-    amap->pdata = g_new0(GigArgMapEntry, entry_array->len);
-    for (gint i = 0; i < entry_array->len; i++) {
-        GigArgMapEntry *entry = g_ptr_array_index(entry_array, i);
-        memmove(&amap->pdata[i], entry, sizeof(GigArgMapEntry));
-    }
-    g_ptr_array_free(entry_array, FALSE);
 
     return amap;
 }
