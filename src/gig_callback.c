@@ -91,7 +91,7 @@ callback_binding(ffi_cif *cif, gpointer ret, gpointer *ffi_args, gpointer user_d
             giarg.v_pointer = ffi_args[i];
         }
 
-        gig_argument_c_to_scm("callback", i, &amap->pdata[i], &giarg, &s_entry, -1);
+        gig_argument_c_to_scm("callback", i, &amap->pdata[i].meta, &giarg, &s_entry, -1);
         s_args = scm_append(scm_list_2(s_args, scm_list_1(s_entry)));
     }
 
@@ -104,7 +104,7 @@ callback_binding(ffi_cif *cif, gpointer ret, gpointer *ffi_args, gpointer user_d
     else {
         GIArgument giarg;
         gsize size;
-        gig_argument_scm_to_c("callback", 0, &amap->return_val, s_ret, NULL, &giarg, &size);
+        gig_argument_scm_to_c("callback", 0, &amap->return_val.meta, s_ret, NULL, &giarg, &size);
         // I'm pretty sure I don't need a big type case/switch block here.
         // I'll try brutally coercing the data, and see what happens.
         *(ffi_arg *) ret = giarg.v_uint64;
