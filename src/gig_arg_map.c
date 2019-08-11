@@ -56,12 +56,7 @@ static void
 arg_map_entry_init(GigArgMapEntry *entry)
 {
     memset(entry, 0, sizeof(GigArgMapEntry));
-    entry->i = -1;
     entry->array_length_index = -1;
-    entry->c_input_pos = -1;
-    entry->c_output_pos = -1;
-    entry->s_input_pos = -1;
-    entry->s_output_pos = -1;
 }
 
 static gboolean
@@ -326,6 +321,7 @@ arg_map_determine_argument_presence(GigArgMap *amap)
                 entry->child = &amap->pdata[entry->array_length_index];
                 entry->child->tuple = GIG_ARG_TUPLE_ARRAY_SIZE;
                 entry->child->presence = GIG_ARG_PRESENCE_IMPLICIT;
+                entry->child->is_s_output = 0;
                 entry->child->parent = entry;
             }
         }
@@ -337,6 +333,7 @@ arg_map_determine_argument_presence(GigArgMap *amap)
             amap->return_val.child = &amap->pdata[amap->return_val.array_length_index];
             amap->return_val.child->tuple = GIG_ARG_TUPLE_ARRAY_SIZE;
             amap->return_val.child->presence = GIG_ARG_PRESENCE_IMPLICIT;
+            amap->return_val.child->is_s_output = 0;
             amap->return_val.child->parent = &amap->return_val;
         }
     }
@@ -362,19 +359,24 @@ arg_map_compute_c_invoke_positions(GigArgMap *amap)
         // call.
         if (dir == GI_DIRECTION_IN) {
             entry->s_direction = GIG_ARG_DIRECTION_INPUT;
+            entry->is_c_input = 1;
             entry->c_input_pos = c_input_pos++;
         }
         else if (dir == GI_DIRECTION_INOUT) {
             entry->s_direction = GIG_ARG_DIRECTION_INOUT;
+            entry->is_c_input = 1;
             entry->c_input_pos = c_input_pos++;
+            entry->is_c_output = 1;
             entry->c_output_pos = c_output_pos++;
         }
         else if (dir == GI_DIRECTION_OUT && is_caller_allocates) {
             entry->s_direction = GIG_ARG_DIRECTION_PREALLOCATED_OUTPUT;
+            entry->is_c_output = 1;
             entry->c_output_pos = c_output_pos++;
         }
         else {
             entry->s_direction = GIG_ARG_DIRECTION_OUTPUT;
+            entry->is_c_output = 1;
             entry->c_output_pos = c_output_pos++;
         }
     }
@@ -397,6 +399,7 @@ arg_map_compute_s_call_positions(GigArgMap *amap)
             entry->s_direction == GIG_ARG_DIRECTION_INOUT ||
             entry->s_direction == GIG_ARG_DIRECTION_PREALLOCATED_OUTPUT) {
             if (entry->tuple == GIG_ARG_TUPLE_SINGLETON || entry->tuple == GIG_ARG_TUPLE_ARRAY) {
+                entry->is_s_input = 1;
                 entry->s_input_pos = s_input_pos++;
                 if (entry->presence == GIG_ARG_PRESENCE_REQUIRED)
                     amap->s_input_req++;
@@ -405,8 +408,10 @@ arg_map_compute_s_call_positions(GigArgMap *amap)
             }
         }
         else if (entry->s_direction == GIG_ARG_DIRECTION_OUTPUT) {
-            if (entry->tuple == GIG_ARG_TUPLE_SINGLETON || entry->tuple == GIG_ARG_TUPLE_ARRAY)
+            if (entry->tuple == GIG_ARG_TUPLE_SINGLETON || entry->tuple == GIG_ARG_TUPLE_ARRAY) {
+                entry->is_s_output = 1;
                 entry->s_output_pos = s_output_pos++;
+            }
         }
         else
             g_assert_not_reached();
@@ -453,9 +458,14 @@ gig_amap_dump(const GigArgMap *amap)
         g_string_append_printf(s, ", %s, %s, %s",
                                dir_strings[entry->s_direction],
                                tuple_strings[entry->tuple], presence_strings[entry->presence]);
-        g_string_append_printf(s, ", SCM In %d, Out %d, C In %d, Out %d",
-                               entry->s_input_pos, entry->s_output_pos,
-                               entry->c_input_pos, entry->c_output_pos);
+        if (entry->is_c_input)
+            g_string_append_printf(s, ", C input %d", entry->c_input_pos);
+        if (entry->is_c_output)
+            g_string_append_printf(s, ", C output %d", entry->c_output_pos);
+        if (entry->is_s_input)
+            g_string_append_printf(s, ", SCM input %d", entry->s_input_pos);
+        if (entry->is_s_output)
+            g_string_append_printf(s, ", S output %d", entry->c_output_pos);
         g_debug("%s", s->str);
         g_string_free(s, TRUE);
     }
@@ -493,7 +503,7 @@ gig_amap_get_input_entry_by_s(GigArgMap *amap, gint spos)
     g_assert_nonnull(amap);
     gint i = 0;
     while (i < amap->len) {
-        if (amap->pdata[i].s_input_pos == spos) {
+        if (amap->pdata[i].is_s_input && (amap->pdata[i].s_input_pos == spos)) {
             return &amap->pdata[i];
         }
         i++;
@@ -508,7 +518,7 @@ gig_amap_get_output_entry_by_c(GigArgMap *amap, gint cpos)
 
     gint i = 0;
     while (i < amap->len) {
-        if (amap->pdata[i].c_output_pos == cpos) {
+        if (amap->pdata[i].is_c_output && (amap->pdata[i].c_output_pos == cpos)) {
             return &amap->pdata[i];
         }
         i++;
@@ -527,7 +537,7 @@ gig_amap_output_child_c(GigArgMap *amap, gint c_output_pos, gint *cinvoke_output
 
     gint i = 0;
     while (i < amap->len) {
-        if (amap->pdata[i].c_output_pos == c_output_pos) {
+        if (amap->pdata[i].is_c_output && (amap->pdata[i].c_output_pos == c_output_pos)) {
             if (amap->pdata[i].child) {
                 *cinvoke_output_array_size_index = amap->pdata[i].child->c_output_pos;
                 return TRUE;
@@ -554,25 +564,46 @@ gig_amap_c_count(const GigArgMap *amap, gint *c_input_len, gint *c_output_len)
 // For the gsubr argument at position INDEX, get the input and output
 // index positions for this argument in the C function call.  Return
 // TRUE if this gsubr argument is used in the C function call.
+
 gboolean
-gig_amap_input_s_2_inout_c(const GigArgMap *amap, gint s_input_pos,
-                           gint *c_input_pos, gint *c_output_pos)
+gig_amap_input_s_2_input_c(const GigArgMap *amap, gint s_input_pos, gint *c_input_pos)
 {
     g_assert_nonnull(amap);
     g_assert_nonnull(c_input_pos);
+
+    gint i = 0;
+    while (i < amap->len) {
+        if (amap->pdata[i].is_s_input && (amap->pdata[i].s_input_pos == s_input_pos)) {
+            if (amap->pdata[i].is_c_input) {
+                *c_input_pos = amap->pdata[i].c_input_pos;
+                return TRUE;
+            }
+            else
+                return FALSE;
+        }
+        i++;
+    }
+    g_return_val_if_reached(FALSE);
+}
+
+gboolean
+gig_amap_input_s_2_output_c(const GigArgMap *amap, gint s_input_pos, gint *c_output_pos)
+{
+    g_assert_nonnull(amap);
     g_assert_nonnull(c_output_pos);
 
     gint i = 0;
     while (i < amap->len) {
-        if (amap->pdata[i].s_input_pos == s_input_pos) {
-            *c_input_pos = amap->pdata[i].c_input_pos;
-            *c_output_pos = amap->pdata[i].c_output_pos;
-            return (*c_input_pos >= 0 || *c_output_pos >= 0);
+        if (amap->pdata[i].is_s_input && (amap->pdata[i].s_input_pos == s_input_pos)) {
+            if (amap->pdata[i].is_c_output) {
+                *c_output_pos = amap->pdata[i].c_output_pos;
+                return TRUE;
+            }
+            else
+                return FALSE;
         }
         i++;
     }
-    *c_input_pos = -1;
-    *c_output_pos = -1;
     g_return_val_if_reached(FALSE);
 }
 
@@ -582,32 +613,54 @@ gig_amap_input_s_2_inout_c(const GigArgMap *amap, gint s_input_pos,
 // function call.  Return TRUE if this gsubr argument's array size is
 // used in the C function call.
 gboolean
-gig_amap_input_s_2_child_inout_c(const GigArgMap *amap, gint s_input_pos,
-                                 gint *c_input_pos, gint *c_output_pos)
+gig_amap_input_s_2_child_input_c(const GigArgMap *amap, gint s_input_pos, gint *c_input_pos)
 {
     g_assert_nonnull(amap);
     g_assert_nonnull(c_input_pos);
+
+    gint i = 0;
+    while (i < amap->len) {
+        if (amap->pdata[i].is_s_input && (amap->pdata[i].s_input_pos == s_input_pos)) {
+            GigArgMapEntry *child = amap->pdata[i].child;
+            if (child) {
+                if (child->is_c_input) {
+                    *c_input_pos = child->c_input_pos;
+                    return TRUE;
+                }
+                else
+                    return FALSE;
+            }
+            else
+                return FALSE;
+        }
+        i++;
+    }
+    g_return_val_if_reached(FALSE);
+}
+
+gboolean
+gig_amap_input_s_2_child_output_c(const GigArgMap *amap, gint s_input_pos, gint *c_output_pos)
+{
+    g_assert_nonnull(amap);
     g_assert_nonnull(c_output_pos);
 
     gint i = 0;
     while (i < amap->len) {
-        if (amap->pdata[i].s_input_pos == s_input_pos) {
+        if (amap->pdata[i].is_s_input && (amap->pdata[i].s_input_pos == s_input_pos)) {
             GigArgMapEntry *child = amap->pdata[i].child;
             if (child) {
-                *c_input_pos = child->c_input_pos;
-                *c_output_pos = child->c_output_pos;
-                return (*c_input_pos >= 0 || *c_output_pos >= 0);
+                if (child->is_c_output) {
+                    *c_output_pos = child->c_output_pos;
+                    return TRUE;
+                }
+                else
+                    return FALSE;
             }
-            else {
-                *c_input_pos = -1;
-                *c_output_pos = -1;
+            else
                 return FALSE;
-            }
         }
         i++;
     }
-    *c_input_pos = -1;
-    *c_output_pos = -1;
     g_return_val_if_reached(FALSE);
 }
 
@@ -616,14 +669,10 @@ gig_amap_input_s_2_child_inout_c(const GigArgMap *amap, gint s_input_pos,
 gboolean
 gig_amap_input_i2c(const GigArgMap *amap, gint i, gint *cpos)
 {
-    if (i < 0 || i >= amap->len) {
-        *cpos = -1;
+    if (i < 0 || i >= amap->len)
         g_return_val_if_reached(FALSE);
-    }
-    if (amap->pdata[i].c_input_pos < 0) {
-        *cpos = -1;
+    if (!amap->pdata[i].is_c_input)
         return FALSE;
-    }
     *cpos = amap->pdata[i].c_input_pos;
     return TRUE;
 }
@@ -631,14 +680,10 @@ gig_amap_input_i2c(const GigArgMap *amap, gint i, gint *cpos)
 gboolean
 gig_amap_input_i2s(const GigArgMap *amap, gint i, gint *spos)
 {
-    if (i < 0 || i >= amap->len) {
-        *spos = -1;
+    if (i < 0 || i >= amap->len)
         g_return_val_if_reached(FALSE);
-    }
-    if (amap->pdata[i].s_input_pos < 0) {
-        *spos = -1;
+    if (!amap->pdata[i].is_s_input)
         return FALSE;
-    }
     *spos = amap->pdata[i].s_input_pos;
     return TRUE;
 }
@@ -647,18 +692,16 @@ gboolean
 gig_amap_input_c2i(const GigArgMap *amap, gint cpos, gint *i)
 {
     if (cpos < 0 || cpos >= amap->c_input_len) {
-        *i = -1;
         g_return_val_if_reached(FALSE);
     }
     gint j = 0;
     while (j < amap->len) {
-        if (amap->pdata[j].c_input_pos >= 0 && amap->pdata[j].c_input_pos == cpos) {
+        if (amap->pdata[j].is_c_input && (amap->pdata[j].c_input_pos == cpos)) {
             *i = j;
             return TRUE;
         }
         j++;
     }
-    *i = -1;
     return FALSE;
 }
 
@@ -667,18 +710,16 @@ gboolean
 gig_amap_input_s2i(const GigArgMap *amap, gint spos, gint *i)
 {
     if (spos < 0 || spos >= amap->s_input_req + amap->s_input_opt) {
-        *i = -1;
         g_return_val_if_reached(FALSE);
     }
     gint j = 0;
     while (j < amap->len) {
-        if (amap->pdata[j].s_input_pos >= 0 && amap->pdata[j].s_input_pos == spos) {
+        if (amap->pdata[j].is_s_input && (amap->pdata[j].s_input_pos == spos)) {
             *i = j;
             return TRUE;
         }
         j++;
     }
-    *i = -1;
     return FALSE;
 }
 
@@ -686,24 +727,21 @@ gboolean
 gig_amap_input_c2s(const GigArgMap *amap, gint cpos, gint *spos)
 {
     if (cpos < 0 || cpos >= amap->c_input_len) {
-        *spos = -1;
         g_return_val_if_reached(FALSE);
     }
     gint j = 0;
     while (j < amap->len) {
-        if (amap->pdata[j].c_input_pos >= 0 && amap->pdata[j].c_input_pos == cpos) {
-            if (amap->pdata[j].s_input_pos >= 0) {
+        if (amap->pdata[j].is_c_input && (amap->pdata[j].c_input_pos == cpos)) {
+            if (amap->pdata[j].is_s_input) {
                 *spos = amap->pdata[j].s_input_pos;
                 return TRUE;
             }
             else {
-                *spos = -1;
                 return FALSE;
             }
         }
         j++;
     }
-    *spos = -1;
     return FALSE;
 }
 
@@ -711,24 +749,20 @@ gboolean
 gig_amap_input_s2c(const GigArgMap *am, gint spos, gint *cpos)
 {
     if (spos < 0 || spos >= am->s_input_req + am->s_input_opt) {
-        *cpos = -1;
         g_return_val_if_reached(FALSE);
     }
     int j = 0;
     while (j < am->len) {
-        if (am->pdata[j].s_input_pos >= 0 && am->pdata[j].s_input_pos == spos) {
-            if (am->pdata[j].c_input_pos >= 0) {
+        if (am->pdata[j].is_s_input && (am->pdata[j].s_input_pos == spos)) {
+            if (am->pdata[j].is_c_input) {
                 *cpos = am->pdata[j].c_input_pos;
                 return TRUE;
             }
-            else {
-                *cpos = -1;
+            else
                 return FALSE;
-            }
         }
         j++;
     }
-    *cpos = -1;
     return FALSE;
 }
 
@@ -737,14 +771,10 @@ gig_amap_input_s2c(const GigArgMap *am, gint spos, gint *cpos)
 gboolean
 gig_amap_output_i2c(const GigArgMap *amap, gint i, gint *cpos)
 {
-    if (i < 0 || i >= amap->len) {
-        *cpos = -1;
+    if (i < 0 || i >= amap->len)
         g_return_val_if_reached(FALSE);
-    }
-    if (amap->pdata[i].c_output_pos < 0) {
-        *cpos = -1;
+    if (!amap->pdata[i].is_c_output)
         return FALSE;
-    }
     *cpos = amap->pdata[i].c_output_pos;
     return TRUE;
 }
@@ -752,14 +782,10 @@ gig_amap_output_i2c(const GigArgMap *amap, gint i, gint *cpos)
 gboolean
 gig_amap_output_i2s(const GigArgMap *amap, gint i, gint *spos)
 {
-    if (i < 0 || i >= amap->len) {
-        *spos = -1;
+    if (i < 0 || i >= amap->len)
         g_return_val_if_reached(FALSE);
-    }
-    if (amap->pdata[i].s_output_pos < 0) {
-        *spos = -1;
+    if (!amap->pdata[i].is_s_output)
         return FALSE;
-    }
     *spos = amap->pdata[i].s_output_pos;
     return TRUE;
 }
@@ -767,19 +793,16 @@ gig_amap_output_i2s(const GigArgMap *amap, gint i, gint *spos)
 gboolean
 gig_amap_output_c2i(const GigArgMap *amap, gint cpos, gint *i)
 {
-    if (cpos < 0 || cpos >= amap->c_output_len) {
-        *i = -1;
+    if (cpos < 0 || cpos >= amap->c_output_len)
         g_return_val_if_reached(FALSE);
-    }
     gint j = 0;
     while (j < amap->len) {
-        if (amap->pdata[j].c_output_pos >= 0 && amap->pdata[j].c_output_pos == cpos) {
+        if (amap->pdata[j].is_c_output && (amap->pdata[j].c_output_pos == cpos)) {
             *i = j;
             return TRUE;
         }
         j++;
     }
-    *i = -1;
     return FALSE;
 }
 
@@ -787,69 +810,56 @@ gig_amap_output_c2i(const GigArgMap *amap, gint cpos, gint *i)
 gboolean
 gig_amap_output_s2i(const GigArgMap *amap, gint spos, gint *i)
 {
-    if (spos < 0 || spos >= amap->s_output_len) {
-        *i = -1;
+    if (spos < 0 || spos >= amap->s_output_len)
         g_return_val_if_reached(FALSE);
-    }
     gint j = 0;
     while (j < amap->len) {
-        if (amap->pdata[j].s_output_pos >= 0 && amap->pdata[j].s_output_pos == spos) {
+        if (amap->pdata[j].is_s_output && (amap->pdata[j].s_output_pos == spos)) {
             *i = j;
             return TRUE;
         }
         j++;
     }
-    *i = -1;
     return FALSE;
 }
 
 gboolean
 gig_amap_output_c2s(const GigArgMap *amap, gint cpos, gint *spos)
 {
-    if (cpos < 0 || cpos >= amap->c_output_len) {
-        *spos = -1;
+    if (cpos < 0 || cpos >= amap->c_output_len)
         g_return_val_if_reached(FALSE);
-    }
     gint j = 0;
     while (j < amap->len) {
-        if (amap->pdata[j].c_output_pos >= 0 && amap->pdata[j].c_output_pos == cpos) {
-            if (amap->pdata[j].s_output_pos >= 0) {
+        if (amap->pdata[j].is_c_output && (amap->pdata[j].c_output_pos == cpos)) {
+            if (amap->pdata[j].is_s_output) {
                 *spos = amap->pdata[j].s_output_pos;
                 return TRUE;
             }
-            else {
-                *spos = -1;
+            else
                 return FALSE;
-            }
         }
         j++;
     }
-    *spos = -1;
     return FALSE;
 }
 
 gboolean
 gig_amap_output_s2c(const GigArgMap *am, gint spos, gint *cpos)
 {
-    if (spos < 0 || spos >= am->s_output_len) {
-        *cpos = -1;
+    if (spos < 0 || spos >= am->s_output_len)
         g_return_val_if_reached(FALSE);
-    }
     int j = 0;
     while (j < am->len) {
-        if (am->pdata[j].s_output_pos >= 0 && am->pdata[j].s_output_pos == spos) {
-            if (am->pdata[j].c_output_pos >= 0) {
+        if (am->pdata[j].is_s_output && (am->pdata[j].s_output_pos == spos)) {
+            if (am->pdata[j].is_c_output) {
                 *cpos = am->pdata[j].c_output_pos;
                 return TRUE;
             }
-            else {
-                *cpos = -1;
+            else
                 return FALSE;
-            }
         }
         j++;
     }
-    *cpos = -1;
     return FALSE;
 }
 

@@ -109,6 +109,11 @@ struct _GigArgMapEntry
     GigArgPresence presence;
     // This arg's index in g_callable_info_get_arg()
 
+    guint8 is_c_input:1;
+    guint8 is_c_output:1;
+    guint8 is_s_input:1;
+    guint8 is_s_output:1;
+    guint8 padding:4;
 
     gint i;
     // This arg's position in input args of g_function_info_invoke
@@ -159,10 +164,10 @@ GigArgMapEntry *gig_amap_get_output_entry_by_c(GigArgMap *am, gint cpos);
 gboolean gig_amap_output_child_c(GigArgMap *am, gint c_output_pos,
                                  gint *cinvoke_output_array_size_index);
 void gig_amap_c_count(const GigArgMap *am, gint *c_input_pos, gint *c_output_pos);
-gboolean gig_amap_input_s_2_inout_c(const GigArgMap *amap, gint s_input, gint *c_input,
-                                    gint *c_output);
-gboolean gig_amap_input_s_2_child_inout_c(const GigArgMap *amap, gint s_input, gint *c_input,
-                                          gint *c_output);
+gboolean gig_amap_input_s_2_input_c(const GigArgMap *amap, gint s_input, gint *c_input);
+gboolean gig_amap_input_s_2_output_c(const GigArgMap *amap, gint s_input, gint *c_output);
+gboolean gig_amap_input_s_2_child_input_c(const GigArgMap *amap, gint s_input, gint *c_input);
+gboolean gig_amap_input_s_2_child_output_c(const GigArgMap *amap, gint s_input, gint *c_output);
 gboolean gig_amap_get_cinvoke_array_length_indices(const GigArgMap *am, gint s_input_pos,
                                                    gint *c_input_pos, gint *c_output_pos);
 gboolean gig_amap_input_i2c(const GigArgMap *amap, gint i, gint *c);
