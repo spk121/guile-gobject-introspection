@@ -36,6 +36,11 @@ const gchar presence_strings[GIG_ARG_PRESENCE_COUNT][9] = {
     [GIG_ARG_PRESENCE_IMPLICIT] = "implicit"
 };
 
+static GigArgMap *arg_map_allocate(gsize n);
+static void arg_map_apply_function_info(GigArgMap *amap, GIFunctionInfo *func_info);
+static void arg_map_determine_argument_presence(GigArgMap *amap);
+static void arg_map_compute_c_invoke_positions(GigArgMap *amap);
+static void arg_map_compute_s_call_positions(GigArgMap *amap);
 static GigArgMapEntry *arg_map_entry_new(void);
 static void arg_map_entry_init(GigArgMapEntry *map);
 
@@ -220,24 +225,77 @@ gig_amap_entry_apply_callable_info(GigArgMapEntry *e, GICallableInfo *ci)
 GigArgMap *
 gig_amap_new(GICallableInfo *function_info)
 {
-    gsize arg_info_count = g_callable_info_get_n_args(function_info);
-    GigArgMap *amap = g_new0(GigArgMap, 1);
-    amap->pdata = g_new0(GigArgMapEntry, arg_info_count);
-    amap->len = arg_info_count;
+    GigArgMap *amap;
+    gsize n;
+
+    n = g_callable_info_get_n_args(function_info);
+    amap = arg_map_allocate(n);
     amap->name = g_strdup(g_base_info_get_name(function_info));
-    for (gsize i = 0; i < arg_info_count; i++)
+    arg_map_apply_function_info(amap, function_info);
+    arg_map_determine_argument_presence(amap);
+    arg_map_compute_c_invoke_positions(amap);
+    arg_map_compute_s_call_positions(amap);
+    return amap;
+}
+
+static GigArgMap *
+arg_map_allocate(gsize n)
+{
+    GigArgMap *amap;
+
+    amap = g_new0(GigArgMap, 1);
+    amap->pdata = g_new0(GigArgMapEntry, n);
+    amap->len = n;
+    for (gsize i = 0; i < n; i++) {
         arg_map_entry_init(&amap->pdata[i]);
+        amap->pdata[i].i = i;
+    }
     arg_map_entry_init(&amap->return_val);
+
+    return amap;
+}
+
+static void
+arg_map_apply_function_info(GigArgMap *amap, GIFunctionInfo *func_info)
+{
+    gint i, n;
+    GIArgInfo *arg_info;
+    GigArgMapEntry *entry;
+
+    n = amap->len;
+
+    for (i = 0; i < n; i++) {
+        arg_info = g_callable_info_get_arg(func_info, i);
+        GITypeInfo *type_info = g_arg_info_get_type(arg_info);
+        GITypeTag type_tag = g_type_info_get_tag(type_info);
+        entry = &amap->pdata[i];
+        gig_amap_entry_apply_arg_info(entry, arg_info);
+        g_base_info_unref(type_info);
+        g_base_info_unref(arg_info);
+        if (type_tag == GI_TYPE_TAG_ARRAY)
+            fill_array_info(entry);
+    }
+
+    gig_amap_entry_apply_callable_info(&amap->return_val, func_info);
+    if (amap->return_val.type_tag == GI_TYPE_TAG_ARRAY)
+        fill_array_info(&amap->return_val);
+}
+
+
+static void
+arg_map_determine_argument_presence(GigArgMap *amap)
+{
+    GigArgMapEntry *entry;
+    gboolean opt_flag = TRUE;
+    gint i, n;
+
+    n = amap->len;
 
     // may-be-null parameters at the end of the C call can be made
     // optional parameters in the gsubr call.
-    gboolean opt_flag = TRUE;
-    for (gint i = arg_info_count - 1; i >= 0; i--) {
-        GIArgInfo *arg_info = g_callable_info_get_arg(function_info, i);
-        GigArgMapEntry *entry = &amap->pdata[i];
-        gig_amap_entry_apply_arg_info(entry, arg_info);
-        g_base_info_unref(arg_info);
-
+    for (i = n - 1; i >= 0; i--) {
+        entry = &amap->pdata[i];
+        entry->tuple = GIG_ARG_TUPLE_SINGLETON;
         entry->i = i;
         GIDirection dir = entry->c_direction;
         if (dir == GI_DIRECTION_IN
@@ -255,21 +313,12 @@ gig_amap_new(GICallableInfo *function_info)
         }
     }
 
-    gint c_input_pos = 0;
-    gint c_output_pos = 0;
-    gint s_input_pos = 0;
-    gint s_output_pos = 0;
-    for (gsize i = 0; i < arg_info_count; i++) {
-        GigArgMapEntry *entry = &amap->pdata[i];
+    // In C, if there is an array defined as a pointer and a
+    // length parameter, it becomes a single S parameter.
+    for (i = 0; i < n; i++) {
+        entry = &amap->pdata[i];
 
-        GIDirection dir = entry->c_direction;
-        GITypeInfo *type_info = entry->type_info;
-        GITypeTag type_tag = g_type_info_get_tag(type_info);
-        gboolean is_caller_allocates = entry->is_caller_allocates;
-
-
-        if (type_tag == GI_TYPE_TAG_ARRAY) {
-            fill_array_info(entry);
+        if (entry->type_tag == GI_TYPE_TAG_ARRAY) {
             // Sometime a single SCM array or list will map to two
             // arguments: a C array pointer and a C size parameter.
             if (entry->array_length_index >= 0) {
@@ -280,6 +329,32 @@ gig_amap_new(GICallableInfo *function_info)
                 entry->child->parent = entry;
             }
         }
+    }
+
+    if (amap->return_val.type_tag == GI_TYPE_TAG_ARRAY) {
+        if (amap->return_val.array_length_index >= 0) {
+            amap->return_val.tuple = GIG_ARG_TUPLE_ARRAY;
+            amap->return_val.child = &amap->pdata[amap->return_val.array_length_index];
+            amap->return_val.child->tuple = GIG_ARG_TUPLE_ARRAY_SIZE;
+            amap->return_val.child->presence = GIG_ARG_PRESENCE_IMPLICIT;
+            amap->return_val.child->parent = &amap->return_val;
+        }
+    }
+
+}
+
+static void
+arg_map_compute_c_invoke_positions(GigArgMap *amap)
+{
+    gint n = amap->len;
+
+    gint c_input_pos = 0;
+    gint c_output_pos = 0;
+
+    for (gsize i = 0; i < n; i++) {
+        GigArgMapEntry *entry = &amap->pdata[i];
+        GIDirection dir = entry->c_direction;
+        gboolean is_caller_allocates = entry->is_caller_allocates;
 
         // Here we find the positions of this argument in the
         // g_function_info_invoke call.  Also, some output parameters
@@ -304,19 +379,16 @@ gig_amap_new(GICallableInfo *function_info)
         }
     }
 
-    arg_map_entry_init(&amap->return_val);
-    gig_amap_entry_apply_callable_info(&amap->return_val, function_info);
-    if (amap->return_val.type_tag == GI_TYPE_TAG_ARRAY) {
-        fill_array_info(&amap->return_val);
-        if (amap->return_val.array_length_index >= 0) {
-            amap->return_val.tuple = GIG_ARG_TUPLE_ARRAY;
-            amap->return_val.child = &amap->pdata[amap->return_val.array_length_index];
-            amap->return_val.child->tuple = GIG_ARG_TUPLE_ARRAY_SIZE;
-            amap->return_val.child->presence = GIG_ARG_PRESENCE_IMPLICIT;
-            amap->return_val.child->parent = &amap->return_val;
-        }
-    }
+    amap->c_input_len = c_input_pos;
+    amap->c_output_len = c_output_pos;
+}
 
+static void
+arg_map_compute_s_call_positions(GigArgMap *amap)
+{
+    gsize arg_info_count = amap->len;
+    gint s_input_pos = 0;
+    gint s_output_pos = 0;
     // We now can decide where these arguments appear in the SCM GSubr
     // call.
     for (gsize i = 0; i < arg_info_count; i++) {
@@ -341,13 +413,8 @@ gig_amap_new(GICallableInfo *function_info)
 
     }
 
-
-    g_assert_cmpint(amap->s_input_req + amap->s_input_opt, ==, s_input_pos);
     amap->s_output_len = s_output_pos;
-    amap->c_input_len = c_input_pos;
-    amap->c_output_len = c_output_pos;
-
-    return amap;
+    g_assert_cmpint(amap->s_input_req + amap->s_input_opt, ==, s_input_pos);
 }
 
 void
