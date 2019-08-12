@@ -17,22 +17,22 @@
 #include "config.h"
 #endif
 
-#include <time.h>
+#include <girepository.h>
 #include <glib-object.h>
 #include <glib.h>
-#include <girepository.h>
 #include <libguile.h>
 #include <stdio.h>
-#include "gig_object.h"
-#include "gig_value.h"
-#include "gig_signal.h"
+#include <time.h>
 #include "gig_argument.h"
-#include "gig_type.h"
 #include "gig_callback.h"
-#include "gig_function.h"
 #include "gig_constant.h"
 #include "gig_flag.h"
+#include "gig_function.h"
+#include "gig_object.h"
+#include "gig_signal.h"
+#include "gig_type.h"
 #include "gig_util.h"
+#include "gig_value.h"
 
 #ifdef ENABLE_GCOV
 void __gcov_reset(void);
@@ -71,6 +71,7 @@ gig_log_writer(GLogLevelFlags flags, const GLogField *fields, gsize n_fields, gp
     const GLogField *message, domain;
 
     const gchar *prefix, *color;
+    scm_init_guile();
     switch (flags & G_LOG_LEVEL_MASK) {
     case G_LOG_LEVEL_ERROR:
         color = "\033[1;31m%s\033[0m";
