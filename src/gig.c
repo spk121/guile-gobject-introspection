@@ -23,6 +23,7 @@
 #include <libguile.h>
 #include <stdio.h>
 #include <time.h>
+#include <threads.h>
 #include "gig_argument.h"
 #include "gig_callback.h"
 #include "gig_constant.h"
@@ -42,6 +43,8 @@ void __gcov_dump(void);
 #ifdef MTRACE
 #include <mcheck.h>
 #endif
+
+thread_local int logger_initialized = 0;
 
 static const GLogField *
 field_ref(const gchar *needle, const GLogField *fields, gsize n_fields)
@@ -71,7 +74,10 @@ gig_log_writer(GLogLevelFlags flags, const GLogField *fields, gsize n_fields, gp
     const GLogField *message, domain;
 
     const gchar *prefix, *color;
-    scm_init_guile();
+    if (!logger_initialized) {
+        scm_init_guile();
+        logger_initialized = 1;
+    }
     switch (flags & G_LOG_LEVEL_MASK) {
     case G_LOG_LEVEL_ERROR:
         color = "\033[1;31m%s\033[0m";
