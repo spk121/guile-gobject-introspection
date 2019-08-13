@@ -41,7 +41,6 @@ gig_type_meta_init_from_arg_info(GigTypeMeta *meta, GIArgInfo *ai)
     GIDirection dir = g_arg_info_get_direction(ai);
     GITransfer transfer = g_arg_info_get_ownership_transfer(ai);
 
-    meta->name = g_strdup(g_base_info_get_name(ai));
     gig_type_meta_init_from_type_info(meta, type_info);
 
     meta->is_in = (dir == GI_DIRECTION_IN || dir == GI_DIRECTION_INOUT);
@@ -88,10 +87,6 @@ add_params(GigTypeMeta *meta, gint n)
 {
     meta->params = g_new0(GigTypeMeta, n);
     meta->n_params = n;
-
-    for (int i = 0; i < n; i++) {
-        meta->params[i].name = g_strdup("(uninitialized)");
-    }
 }
 
 static void
@@ -290,10 +285,6 @@ gig_type_meta_init_from_type_info(GigTypeMeta *meta, GITypeInfo *type_info)
         if (meta->gtype == 0)
             g_warning("gtype of %s is zero", g_base_info_get_name(type_info));
     }
-    if (meta->gtype)
-        meta->name = g_strdup_printf("%s%s", g_type_name(meta->gtype), meta->is_ptr ? "*" : "");
-    else
-        meta->name = g_strdup("(invalid)");
 }
 
 #define STRLEN 128
@@ -303,8 +294,7 @@ const gchar *
 gig_type_meta_describe(GigTypeMeta *meta)
 {
     GString *s = g_string_new(NULL);
-    g_string_append_printf(s, "'%s' %s%s%s",
-                           meta->name,
+    g_string_append_printf(s, "%s%s%s",
                            meta->is_ptr ? "pointer to " : "",
                            meta->is_caller_allocates ? "caller allocated " : "",
                            g_type_name(meta->gtype));

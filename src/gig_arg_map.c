@@ -49,7 +49,6 @@ arg_map_entry_init(GigArgMapEntry *entry)
 {
     memset(entry, 0, sizeof(GigArgMapEntry));
     entry->name = g_strdup("(uninitialized)");
-    entry->meta.name = g_strdup("(uninitialized)");
 }
 
 // Gather information on how to map Scheme arguments to C arguments.
@@ -95,7 +94,6 @@ arg_map_apply_function_info(GigArgMap *amap, GIFunctionInfo *func_info)
 {
     gint i, n;
     GIArgInfo *arg_info;
-    GigArgMapEntry *entry;
 
     n = amap->len;
 

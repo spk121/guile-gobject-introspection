@@ -53,7 +53,6 @@ extern GType g_type_callback;
 typedef struct _GigTypeMeta GigTypeMeta;
 struct _GigTypeMeta
 {
-    gchar *name;
     GType gtype;
     guint16 is_ptr:1;
 
