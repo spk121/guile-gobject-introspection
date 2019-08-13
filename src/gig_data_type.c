@@ -15,7 +15,7 @@
 
 #include <glib-object.h>
 #include "gig_data_type.h"
-
+#include "gig_util.h"
 
 GType g_type_unichar;
 GType g_type_int16;
@@ -214,8 +214,10 @@ gig_type_meta_init_from_type_info(GigTypeMeta *meta, GITypeInfo *type_info)
         if (itype == GI_INFO_TYPE_UNRESOLVED) {
             meta->gtype = G_TYPE_INVALID;
             meta->is_invalid = TRUE;
-            g_warning("Unrepresentable type %s %s %s", g_info_type_to_string(itype),
-                      g_base_info_get_name(referenced_base_info), g_base_info_get_name(type_info));
+            g_warning("Unrepresentable type: %s, %s, %s",
+                      g_base_info_get_name_safe(type_info),
+                      g_base_info_get_name_safe(referenced_base_info),
+                      g_info_type_to_string(itype));
         }
         else if (itype == GI_INFO_TYPE_ENUM || itype == GI_INFO_TYPE_FLAGS) {
             meta->gtype = g_registered_type_info_get_g_type(referenced_base_info);

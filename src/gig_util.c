@@ -174,3 +174,34 @@ scm_printf(SCM port, const gchar *fmt, ...)
     g_free(_message);
     scm_display(message, port);
 }
+
+const gchar *
+g_base_info_get_name_safe(GIBaseInfo *info)
+{
+    GIInfoType type = g_base_info_get_type(info);
+    switch (type) {
+    case GI_INFO_TYPE_FUNCTION:
+    case GI_INFO_TYPE_CALLBACK:
+    case GI_INFO_TYPE_STRUCT:
+    case GI_INFO_TYPE_BOXED:
+    case GI_INFO_TYPE_ENUM:
+    case GI_INFO_TYPE_FLAGS:
+    case GI_INFO_TYPE_OBJECT:
+    case GI_INFO_TYPE_INTERFACE:
+    case GI_INFO_TYPE_CONSTANT:
+    case GI_INFO_TYPE_UNION:
+    case GI_INFO_TYPE_VALUE:
+    case GI_INFO_TYPE_SIGNAL:
+    case GI_INFO_TYPE_PROPERTY:
+    case GI_INFO_TYPE_VFUNC:
+    case GI_INFO_TYPE_FIELD:
+    case GI_INFO_TYPE_ARG:
+    case GI_INFO_TYPE_UNRESOLVED:
+        return g_base_info_get_name(info);
+        break;
+    case GI_INFO_TYPE_TYPE:
+    default:
+        return "(unnamed)";
+        break;
+    }
+}

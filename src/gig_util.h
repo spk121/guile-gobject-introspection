@@ -3,6 +3,7 @@
 
 #include <glib.h>
 #include <libguile.h>
+#include <girepository.h>
 
 // *INDENT-OFF*
 G_BEGIN_DECLS
@@ -18,6 +19,7 @@ SCM scm_class_set_x(SCM cls, SCM slot, SCM val);
 SCM scm_drop_right_1(SCM lst);
 SCM scm_c_reexport(const gchar *name, ...);
 SCM scm_printf(SCM port, const gchar *fmt, ...);
+const gchar *g_base_info_get_name_safe(GIBaseInfo *info);
 
 #define scm_is_equal(a,b) scm_is_true(scm_equal_p(a,b))
 
