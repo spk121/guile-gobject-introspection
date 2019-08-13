@@ -186,6 +186,11 @@ proc4function(GIFunctionInfo *info, const gchar *name, SCM self_type,
     if (!func_gsubr)
         func_gsubr = create_gsubr(info, name, self_type, req, opt, formals, specializers);
 
+    if (!func_gsubr) {
+        g_debug("Could not create a gsubr for %s", name);
+        return SCM_BOOL_F;
+    }
+
     return scm_c_make_gsubr(name, 0, 0, 1, func_gsubr);
 }
 
@@ -264,23 +269,19 @@ make_formals(GICallableInfo *callable,
         n_inputs--;
     }
 
-    for (gint i = 0; i < n_inputs;
-         i++, i_formal = scm_cdr(i_formal), i_specializer = scm_cdr(i_specializer)) {
-        GigArgMapEntry *entry = gig_amap_get_input_entry_by_s(argmap, i);
+    for (gint s = 0; s < n_inputs;
+         s++, i_formal = scm_cdr(i_formal), i_specializer = scm_cdr(i_specializer)) {
+        GigArgMapEntry *entry = gig_amap_get_input_entry_by_s(argmap, s);
         gchar *formal = scm_dynwind_or_bust("%make-formals",
                                             gig_gname_to_scm_name(entry->name));
         scm_set_car_x(i_formal, scm_from_utf8_symbol(formal));
         // don't force types on nullable input, as #f can also be used to represent
         // NULL.
-        if (entry->meta.may_be_null)
+        if (entry->meta.is_nullable)
             continue;
 
-        if (entry->meta.type_tag == GI_TYPE_TAG_INTERFACE) {
-            GIBaseInfo *iface = g_type_info_get_interface(entry->meta.type_info);
-            if (!GI_IS_REGISTERED_TYPE_INFO(iface))
-                continue;
-            GType gtype = g_registered_type_info_get_g_type((GIRegisteredTypeInfo *) iface);
-            SCM s_type = gig_type_get_scheme_type(gtype);
+        if (!G_TYPE_IS_VALUE(entry->meta.gtype)) {
+            SCM s_type = gig_type_get_scheme_type(entry->meta.gtype);
             if (scm_is_true(s_type))
                 scm_set_car_x(i_specializer, s_type);
         }
@@ -294,10 +295,17 @@ create_gsubr(GIFunctionInfo *function_info, const gchar *name, SCM self_type,
 {
     GigFunction *gfn;
     ffi_type *ffi_ret_type;
+    GigArgMap *amap;
+
+    amap = gig_amap_new(function_info);
+    if (amap == NULL) {
+        g_debug("Cannot create gsubr for %s: is has invalid types", name);
+        return NULL;
+    }
 
     gfn = g_new0(GigFunction, 1);
     gfn->function_info = function_info;
-    gfn->amap = gig_amap_new(function_info);
+    gfn->amap = amap;
     gfn->name = g_strdup(name);
     g_base_info_ref(function_info);
 
@@ -422,9 +430,8 @@ gig_function_invoke(GIFunctionInfo *func_info, GigArgMap *amap, const gchar *nam
     if (ok) {
         SCM s_return;
         gsize sz = -1;
-        if (amap->return_val.meta.array_length_index >= 0) {
-            g_assert_cmpint(amap->return_val.meta.array_length_index, <, amap->len);
-            gsize idx = amap->pdata[amap->return_val.meta.array_length_index].c_output_pos;
+        if (amap->return_val.meta.gtype == G_TYPE_LENGTH_CARRAY) {
+            gsize idx = amap->pdata[amap->return_val.meta.length].c_output_pos;
             sz = ((GIArgument *)(cinvoke_output_arg_array->data))[idx].v_size;
         }
 
@@ -549,7 +556,7 @@ object_to_c_arg(GigArgMap *amap, gint s, const gchar *name, SCM obj,
     if (!is_out)
         c_invoke_out = -1;
     if (c_invoke_in >= 0 || c_invoke_out >= 0) {
-        GigArgMapEntry *size_entry = &amap->pdata[entry->meta.array_length_index];
+        GigArgMapEntry *size_entry = &amap->pdata[entry->meta.length];
         GIArgument size_arg;
         gsize dummy_size;
 
@@ -680,7 +687,7 @@ rebox_inout_args(GIFunctionInfo *func_info, GigArgMap *amap,
         for (guint i = 0; i < amap->len; i++) {
             GigArgMapEntry *amap_entry = &amap->pdata[i];
             if ((amap_entry->c_input_pos == c_input_pos)
-                && (amap_entry->meta.c_direction == GI_DIRECTION_INOUT)) {
+                && (amap_entry->meta.is_in && amap_entry->meta.is_out)) {
                 GIArgument *ob = (GIArgument *)(in_args->data);
                 SCM obj;
                 gsize size = GIG_ARRAY_SIZE_UNKNOWN;

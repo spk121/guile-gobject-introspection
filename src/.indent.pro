@@ -106,5 +106,6 @@
 -T GigRepositoryNested
 -T GigSignalSpec
 -T GigSignalSlot
+-T GigTypeMeta
 -T GigTypeRefFunction
 -T GigTypeUnrefFunction

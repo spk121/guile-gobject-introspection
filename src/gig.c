@@ -26,6 +26,7 @@
 #include "gig_argument.h"
 #include "gig_callback.h"
 #include "gig_constant.h"
+#include "gig_data_type.h"
 #include "gig_flag.h"
 #include "gig_function.h"
 #include "gig_object.h"
@@ -156,6 +157,7 @@ gig_init(void)
     mtrace();
 #endif
     g_debug("Begin libguile-gir initialization");
+    gig_init_data_type();
     gig_init_constant();
     gig_init_flag();
     gig_init_argument();

@@ -85,7 +85,7 @@ gig_constant_define(GIConstantInfo *info, SCM defs)
     g_base_info_unref(typeinfo);
 
     scm_permanent_object(scm_c_define(public_name, ret));
-    return scm_cons (scm_from_utf8_symbol(public_name), defs);
+    return scm_cons(scm_from_utf8_symbol(public_name), defs);
 }
 
 void

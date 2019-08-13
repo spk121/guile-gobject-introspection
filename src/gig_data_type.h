@@ -22,49 +22,79 @@
 G_BEGIN_DECLS
 // *INDENT-ON*
 
+extern GType g_type_unichar;
+extern GType g_type_int16;
+extern GType g_type_int32;
+extern GType g_type_uint16;
+extern GType g_type_uint32;
+extern GType g_type_locale_string;
+
+extern GType g_type_fixed_size_carray;
+extern GType g_type_zero_terminated_carray;
+extern GType g_type_length_carray;
+extern GType g_type_list;
+extern GType g_type_slist;
+extern GType g_type_callback;
+
+#define G_TYPE_UNICHAR (g_type_unichar)
+#define G_TYPE_INT16 (g_type_int16)
+#define G_TYPE_INT32 (g_type_int32)
+#define G_TYPE_UINT16 (g_type_uint16)
+#define G_TYPE_UINT32 (g_type_uint32)
+
+#define G_TYPE_LENGTH_CARRAY (g_type_length_carray)
+#define G_TYPE_ZERO_TERMINATED_CARRAY (g_type_zero_terminated_carray)
+#define G_TYPE_FIXED_SIZE_CARRAY (g_type_fixed_size_carray)
+#define G_TYPE_LIST (g_type_list)
+#define G_TYPE_SLIST (g_type_slist)
+#define G_TYPE_LOCALE_STRING (g_type_locale_string)
+#define G_TYPE_CALLBACK (g_type_callback)
+
 typedef struct _GigTypeMeta GigTypeMeta;
 struct _GigTypeMeta
 {
-    ////////////////////////////////////////////////////////////////
-    // This block is similar to GIArgInfo, except it is generic for
-    // both arguments and return types
-    GITypeInfo *type_info;
-    GITypeTag type_tag;
-    gboolean is_ptr;
-    // The direction of the C argument, which may differ from the SCM
-    GIDirection c_direction;
-    // Nothing, container, or everything
-    GITransfer transfer;
-    // For C 'in' values, whether NULL is a valid value.  For 'out'
-    // values, whether NULL may be returned.
-    gboolean may_be_null;
-    // For C 'out' values, whether this argument is allocated by the
-    // caller.
-    gboolean is_caller_allocates;
+    gchar *name;
+    GType gtype;
+    guint16 is_ptr:1;
 
-    ////////////////////////////////////////////////////////////////
-    // This block is additional data that is valid only for arrays
+    // For argument and return values
+    guint16 is_in:1;
+    guint16 is_out:1;
 
-    // The array itself
-    GIArrayType array_type;
-    gsize array_fixed_size;
-    gint array_length_index;
-    gboolean array_is_zero_terminated;
+    // For return values
+    guint16 is_skip:1;          // TRUE when output is ignored
 
-    // The elements of the array
-    GITransfer item_transfer;
-    GITypeTag item_type_tag;
-    gboolean item_is_ptr;
-    gsize item_size;
+    // For pointers
+    guint16 is_caller_allocates:1;
+    guint16 is_optional:1;      // Out-only. Pass in NULL to ignore this.
+    guint16 is_nullable:1;      // For in, can pass in NULL. For out, may return NULL.
 
-    // The objects held by elements of the array
-    GIInfoType referenced_base_type;
-    GType referenced_object_type;
+    // For container types
+    guint16 is_transfer_ownership:1;
+    guint16 is_transfer_container:1;
+
+    // Error status
+    guint16 is_invalid:1;       // True when one of the arguments has
+    // invalid type
+    guint16 padding1:6;
+
+    // For C array types
+    guint16 length;
+    guint16 item_size;
+
+    // Subtypes and callables
+    guint16 n_params;
+    union
+    {
+        GigTypeMeta *params;
+        GICallableInfo *callable_info;
+    };
 };
 
-void gig_type_meta_init_from_arg_info(GigTypeMeta * type, GIArgInfo *ai);
-void gig_type_meta_init_from_callable_info(GigTypeMeta * type, GICallableInfo *ci);
-const char *gig_type_meta_describe(GigTypeMeta * meta);
+void gig_type_meta_init_from_arg_info(GigTypeMeta *type, GIArgInfo *ai);
+void gig_type_meta_init_from_callable_info(GigTypeMeta *type, GICallableInfo *ci);
+const char *gig_type_meta_describe(GigTypeMeta *meta);
+void gig_init_data_type(void);
 
 G_END_DECLS
 #endif

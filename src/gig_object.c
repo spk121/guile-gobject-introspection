@@ -569,7 +569,7 @@ static SCM ensure_accessor_proc;
 static SCM do_define_property(const gchar *, SCM, SCM, SCM);
 
 SCM
-gig_property_define(GType type, GIPropertyInfo *info, const gchar* namespace, SCM defs)
+gig_property_define(GType type, GIPropertyInfo *info, const gchar *namespace, SCM defs)
 {
     SCM formals, specializers;
     GObjectClass *class;
@@ -626,8 +626,7 @@ do_define_property(const gchar *public_name, SCM prop, SCM self_type, SCM value_
     scm_call_2(add_method_proc, generic,
                scm_call_7(make_proc, method_type,
                           kwd_specializers, specializers,
-                          kwd_formals, formals,
-                          kwd_procedure, proc));
+                          kwd_formals, formals, kwd_procedure, proc));
 
     // setter
     setter = scm_setter(prop);
@@ -637,8 +636,7 @@ do_define_property(const gchar *public_name, SCM prop, SCM self_type, SCM value_
     scm_call_2(add_method_proc, scm_setter(generic),
                scm_call_7(make_proc, method_type,
                           kwd_specializers, specializers,
-                          kwd_formals, formals,
-                          kwd_procedure, setter));
+                          kwd_formals, formals, kwd_procedure, setter));
 
     scm_define(sym_public_name, generic);
     return sym_public_name;

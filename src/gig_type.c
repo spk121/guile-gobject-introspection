@@ -229,8 +229,7 @@ gig_type_define(GType gtype, SCM defs)
         case G_TYPE_BOXED:
         {
             dsupers = scm_list_1(SCM_PACK_POINTER(sparent));
-            new_type = scm_call_4(make_class_proc, dsupers, slots, kwd_name,
-                                  type_class_name);
+            new_type = scm_call_4(make_class_proc, dsupers, slots, kwd_name, type_class_name);
 
             GigBoxedFuncs *funcs = _boxed_funcs_for_type(gtype);
 
@@ -274,8 +273,7 @@ gig_type_define(GType gtype, SCM defs)
 
             // dsupers need to be sorted, or else Guile will barf
             dsupers = scm_sort_x(dsupers, type_less_p_proc);
-            new_type = scm_call_4(make_class_proc, dsupers, slots, kwd_name,
-                                  type_class_name);
+            new_type = scm_call_4(make_class_proc, dsupers, slots, kwd_name, type_class_name);
             break;
 
         }

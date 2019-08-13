@@ -113,6 +113,9 @@ struct _GigArgMap
     gint c_input_len;
     gint c_output_len;
 
+    // If this arg map has invalid entries
+    gboolean is_invalid;
+
     // An array of arg_map_entry
     GigArgMapEntry *pdata;
     gint len;
