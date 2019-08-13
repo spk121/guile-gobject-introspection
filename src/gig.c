@@ -23,7 +23,6 @@
 #include <libguile.h>
 #include <stdio.h>
 #include <time.h>
-#include <threads.h>
 #include "gig_argument.h"
 #include "gig_callback.h"
 #include "gig_constant.h"
@@ -44,7 +43,7 @@ void __gcov_dump(void);
 #include <mcheck.h>
 #endif
 
-thread_local int logger_initialized = 0;
+_Thread_local int logger_initialized = 0;
 
 static const GLogField *
 field_ref(const gchar *needle, const GLogField *fields, gsize n_fields)
