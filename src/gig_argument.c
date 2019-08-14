@@ -229,18 +229,17 @@ gig_argument_scm_to_c(S2C_ARG_DECL)
             scm_to_c_string(S2C_ARGS);
             break;
         case G_TYPE_POINTER:
-            if (meta->gtype == G_TYPE_LENGTH_CARRAY
-                || meta->gtype == G_TYPE_FIXED_SIZE_CARRAY
-                || meta->gtype == G_TYPE_ZERO_TERMINATED_CARRAY)
-                scm_to_c_array(S2C_ARGS);
-            else if (meta->gtype == G_TYPE_POINTER)
+            if (meta->gtype == G_TYPE_POINTER)
                 scm_to_c_void_pointer(S2C_ARGS);
             else
                 UNHANDLED;
             break;
         case G_TYPE_BOXED:
         case G_TYPE_OBJECT:
-            if (meta->gtype == G_TYPE_ARRAY)
+            if (meta->gtype == G_TYPE_LENGTH_CARRAY
+                || meta->gtype == G_TYPE_FIXED_SIZE_CARRAY
+                || meta->gtype == G_TYPE_ZERO_TERMINATED_CARRAY
+                || meta->gtype == G_TYPE_ARRAY)
                 scm_to_c_array(S2C_ARGS);
             else
                 scm_to_c_interface(S2C_ARGS);
@@ -1128,15 +1127,16 @@ gig_argument_c_to_scm(C2S_ARG_DECL)
             break;
         case G_TYPE_BOXED:
         case G_TYPE_INTERFACE:
-            c_interface_pointer_to_scm(C2S_ARGS);
+            if (meta->gtype == G_TYPE_ZERO_TERMINATED_CARRAY
+                || meta->gtype == G_TYPE_FIXED_SIZE_CARRAY
+                || meta->gtype == G_TYPE_LENGTH_CARRAY)
+                c_native_array_to_scm(C2S_ARGS);
+            else
+                c_interface_pointer_to_scm(C2S_ARGS);
             break;
         case G_TYPE_POINTER:
             if (meta->gtype == G_TYPE_POINTER)
                 c_void_pointer_to_scm(C2S_ARGS);
-            else if (meta->gtype == G_TYPE_ZERO_TERMINATED_CARRAY
-                     || meta->gtype == G_TYPE_FIXED_SIZE_CARRAY
-                     || meta->gtype == G_TYPE_LENGTH_CARRAY)
-                c_native_array_to_scm(C2S_ARGS);
             else
                 UNHANDLED;
             break;

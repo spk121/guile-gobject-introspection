@@ -324,12 +324,11 @@ gig_init_data_type(void)
     g_type_locale_string = g_type_register_static_simple(G_TYPE_STRING,
                                                          "locale-string", 0, NULL, 0, NULL, 0);
 
-    // g_type_fixed_size_carray = g_type_register_static_simple(G_TYPE_ARRAY, "fixed-size-carray", 0, NULL, 0, NULL, 0);
-    // g_type_zero_terminated_carray = g_type_register_static_simple(G_TYPE_ARRAY, "zero-terminated-carray", 0, NULL, 0, NULL, 0);
-    // g_type_length_carray = g_type_register_static_simple(G_TYPE_ARRAY, "length+carray", 0, NULL, 0, NULL, 0);
-    g_type_fixed_size_carray = g_pointer_type_register_static("fixed-size-carray");
-    g_type_zero_terminated_carray = g_pointer_type_register_static("zero-terminated-carray");
-    g_type_length_carray = g_pointer_type_register_static("length+carray");
+    // These 3 array types are all just aliases for GArray, but, their
+    // types designate how that interacted with the GObject C FFI.
+    g_type_fixed_size_carray = g_boxed_type_register_static("fixed-size-carray", g_array_ref, g_array_unref);
+    g_type_zero_terminated_carray = g_boxed_type_register_static("zero-terminated-carray", g_array_ref, g_array_unref);
+    g_type_length_carray = g_boxed_type_register_static("length+carray", g_array_ref, g_array_unref);
 
     g_type_list = g_list_get_type();
     g_type_slist = g_slist_get_type();
