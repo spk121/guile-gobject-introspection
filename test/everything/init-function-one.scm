@@ -13,6 +13,6 @@
      (format #t "Input After: ~S~%" x)
      (format #t "Output: ~S~%" y)
      (format #t "Success: ~S~%" ret)
-     (and (vector-empty? y)
+     (and (not y)
           ret))))
  
