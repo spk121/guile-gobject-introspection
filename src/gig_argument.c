@@ -16,17 +16,11 @@
 #include <girepository.h>
 #include <glib.h>
 #include <libguile.h>
-#include <math.h>
-#include <stdint.h>
-#include "gig_argument.h"
-#include "gig_object.h"
 #include "gi_type_tag.h"
+#include "gig_argument.h"
 #include "gig_callback.h"
+#include "gig_object.h"
 #include "gig_type.h"
-
-#ifndef FLT_MAX
-#define FLT_MAX 3.402823466e+38F
-#endif
 
 #if GIG_DEBUG_TRANSFERS
 #define TRACE_C2S() g_debug("[C2S] On line %d while handing %s of %s.", __LINE__, gig_type_meta_describe(meta), subr)
@@ -35,7 +29,6 @@
 #define TRACE_C2S()
 #define TRACE_S2C()
 #endif
-
 
 #define SURPRISING \
     do { \
@@ -48,17 +41,22 @@
     } while(FALSE)
 
 static gpointer later_free(GPtrArray *must_free, GigTypeMeta *meta, gpointer ptr);
+
+// Fundamental types
+static void scm_to_c_interface(S2C_ARG_DECL);
 static void scm_to_c_char(S2C_ARG_DECL);
 static void scm_to_c_boolean(S2C_ARG_DECL);
 static void scm_to_c_integer(S2C_ARG_DECL);
 static void scm_to_c_enum(S2C_ARG_DECL);
 static void scm_to_c_real(S2C_ARG_DECL);
-static void scm_to_c_boxed(S2C_ARG_DECL);
-static void scm_to_c_object(S2C_ARG_DECL);
-static void scm_to_c_variant(S2C_ARG_DECL);
-static void scm_to_c_interface(S2C_ARG_DECL);
 static void scm_to_c_string(S2C_ARG_DECL);
 static void scm_to_c_pointer(S2C_ARG_DECL);
+static void scm_to_c_boxed(S2C_ARG_DECL);
+// static void scm_to_c_param(S2C_ARG_DECL);
+static void scm_to_c_object(S2C_ARG_DECL);
+static void scm_to_c_variant(S2C_ARG_DECL);
+
+// Derived types
 static void scm_to_c_native_array(S2C_ARG_DECL);
 static void scm_to_c_native_unichar_array(S2C_ARG_DECL);
 static void scm_to_c_native_boolean_array(S2C_ARG_DECL);
@@ -67,18 +65,22 @@ static void scm_to_c_native_string_array(S2C_ARG_DECL);
 static void scm_to_c_native_interface_array(S2C_ARG_DECL);
 static void scm_to_c_garray(S2C_ARG_DECL);
 static void scm_to_c_byte_array(S2C_ARG_DECL);
+
+// Fundamental types
+static void c_interface_to_scm(C2S_ARG_DECL);
 static void c_char_to_scm(C2S_ARG_DECL);
 static void c_boolean_to_scm(C2S_ARG_DECL);
 static void c_integer_to_scm(C2S_ARG_DECL);
 static void c_enum_to_scm(C2S_ARG_DECL);
 static void c_real_to_scm(C2S_ARG_DECL);
-static void c_boxed_to_scm(C2S_ARG_DECL);
-static void c_object_to_scm(C2S_ARG_DECL);
-static void c_variant_to_scm(C2S_ARG_DECL);
-static void c_param_to_scm(C2S_ARG_DECL);
-static void c_interface_to_scm(C2S_ARG_DECL);
 static void c_string_to_scm(C2S_ARG_DECL);
 static void c_pointer_to_scm(C2S_ARG_DECL);
+static void c_boxed_to_scm(C2S_ARG_DECL);
+static void c_param_to_scm(C2S_ARG_DECL);
+static void c_object_to_scm(C2S_ARG_DECL);
+static void c_variant_to_scm(C2S_ARG_DECL);
+
+// Derived types
 static void c_array_to_scm(C2S_ARG_DECL);
 static void c_byte_array_to_scm(C2S_ARG_DECL);
 static void c_native_array_to_scm(C2S_ARG_DECL);
@@ -240,10 +242,26 @@ gig_argument_scm_to_c(S2C_ARG_DECL)
 }
 
 static void
+scm_to_c_interface(S2C_ARG_DECL)
+{
+    TRACE_S2C();
+    if (meta->is_nullable && scm_is_false(object)) {
+        arg->v_pointer = NULL;
+        return;
+    }
+    else
+        UNHANDLED;
+}
+
+static void
 scm_to_c_char(S2C_ARG_DECL)
 {
     TRACE_S2C();
     GType t = meta->gtype;
+
+    if (!scm_is_integer(object) && !SCM_CHARP(object))
+        scm_wrong_type_arg_msg(subr, argpos, object, "int8");
+
     if (t == G_TYPE_CHAR) {
         if (SCM_CHARP(object)) {
             if (SCM_CHAR(object) > 255)
@@ -252,7 +270,7 @@ scm_to_c_char(S2C_ARG_DECL)
                 arg->v_int8 = (guint8)SCM_CHAR(object);
         }
         else if (!scm_is_signed_integer(object, INT8_MIN, INT8_MAX))
-            scm_wrong_type_arg_msg(subr, argpos, object, "int8");
+            scm_out_of_range(subr, object);
         else
             arg->v_int8 = scm_to_int8(object);
     }
@@ -264,7 +282,7 @@ scm_to_c_char(S2C_ARG_DECL)
                 arg->v_uint8 = (guint8)SCM_CHAR(object);
         }
         else if (!scm_is_unsigned_integer(object, 0, UINT8_MAX))
-            scm_wrong_type_arg_msg(subr, argpos, object, "uint8");
+            scm_out_of_range(subr, object);
         else
             arg->v_uint8 = scm_to_uint8(object);
     }
@@ -274,6 +292,9 @@ static void
 scm_to_c_boolean(S2C_ARG_DECL)
 {
     TRACE_S2C();
+
+    if (!scm_is_eq(object, SCM_BOOL_T) && !scm_is_eq(object, SCM_BOOL_F))
+        return scm_wrong_type_arg_msg(subr, argpos, object, "boolean");
     arg->v_boolean = scm_is_true(object);
 }
 
@@ -326,6 +347,19 @@ scm_to_c_integer(S2C_ARG_DECL)
 }
 
 static void
+scm_to_c_enum(S2C_ARG_DECL)
+{
+    TRACE_S2C();
+    GType fundamental_type = G_TYPE_FUNDAMENTAL(meta->gtype);
+    if (fundamental_type == G_TYPE_ENUM)
+        arg->v_int = scm_to_int(object);
+    else if (fundamental_type == G_TYPE_FLAGS)
+        arg->v_uint = scm_to_uint(object);
+    else
+        UNHANDLED;
+}
+
+static void
 scm_to_c_real(S2C_ARG_DECL)
 {
     TRACE_S2C();
@@ -349,16 +383,48 @@ scm_to_c_real(S2C_ARG_DECL)
 }
 
 static void
-scm_to_c_enum(S2C_ARG_DECL)
+scm_to_c_string(S2C_ARG_DECL)
 {
     TRACE_S2C();
-    GType fundamental_type = G_TYPE_FUNDAMENTAL(meta->gtype);
-    if (fundamental_type == G_TYPE_ENUM)
-        arg->v_int = scm_to_int(object);
-    else if (fundamental_type == G_TYPE_FLAGS)
-        arg->v_uint = scm_to_uint(object);
+    if (meta->is_nullable && scm_is_false(object)) {
+        arg->v_pointer = NULL;
+        return;
+    }
+
+    // Here we convert an input string into an argument.  The input
+    // string is either UTF8 or locale encoded.
+    if (scm_is_bytevector(object)) {
+        // Some methods expect passed-in strings to be overwriteable,
+        // like g_date_strftime(char *s, ...) expects 's' to be a
+        // place to store an output.  Since Glib strings and Guile
+        // strings have no encoding in common, we can use
+        // bytevectors...
+        if (!meta->is_transfer_ownership) {
+            // But when we're using bytevectors as a possibly writable
+            // location, they do need to be null terminated.
+            gboolean terminated = FALSE;
+            for (gsize i = 0; i < SCM_BYTEVECTOR_LENGTH(object); i++)
+                if (SCM_BYTEVECTOR_CONTENTS(object)[i] == 0)
+                    terminated = TRUE;
+            if (!terminated)
+                scm_wrong_type_arg_msg(subr, argpos, object, "null-terminated bytevector");
+            arg->v_string = (char *)SCM_BYTEVECTOR_CONTENTS(object);
+        }
+        else
+            // But when we're copying the contents of the string, the
+            // null termination can be enforced here.
+            arg->v_string = g_strndup((const gchar *)SCM_BYTEVECTOR_CONTENTS(object),
+                                      SCM_BYTEVECTOR_LENGTH(object));
+    }
+    else if (scm_is_string(object)) {
+        if (meta->gtype == G_TYPE_LOCALE_STRING)
+            arg->v_string = scm_to_locale_string(object);
+        else
+            arg->v_string = scm_to_utf8_string(object);
+        LATER_FREE(arg->v_string);
+    }
     else
-        UNHANDLED;
+        scm_wrong_type_arg_msg(subr, argpos, object, "string or bytevector");
 }
 
 static void
@@ -424,64 +490,6 @@ scm_to_c_variant(S2C_ARG_DECL)
     TRACE_S2C();
     arg->v_pointer = gig_type_peek_object(object);
 }
-
-static void
-scm_to_c_interface(S2C_ARG_DECL)
-{
-    TRACE_S2C();
-    if (meta->is_nullable && scm_is_false(object)) {
-        arg->v_pointer = NULL;
-        return;
-    }
-    else
-        UNHANDLED;
-}
-
-static void
-scm_to_c_string(S2C_ARG_DECL)
-{
-    TRACE_S2C();
-    if (meta->is_nullable && scm_is_false(object)) {
-        arg->v_pointer = NULL;
-        return;
-    }
-
-    // Here we convert an input string into an argument.  The input
-    // string is either UTF8 or locale encoded.
-    if (scm_is_bytevector(object)) {
-        // Some methods expect passed-in strings to be overwriteable,
-        // like g_date_strftime(char *s, ...) expects 's' to be a
-        // place to store an output.  Since Glib strings and Guile
-        // strings have no encoding in common, we can use
-        // bytevectors...
-        if (!meta->is_transfer_ownership) {
-            // But when we're using bytevectors as a possibly writable
-            // location, they do need to be null terminated.
-            gboolean terminated = FALSE;
-            for (gsize i = 0; i < SCM_BYTEVECTOR_LENGTH(object); i++)
-                if (SCM_BYTEVECTOR_CONTENTS(object)[i] == 0)
-                    terminated = TRUE;
-            if (!terminated)
-                scm_wrong_type_arg_msg(subr, argpos, object, "null-terminated bytevector");
-            arg->v_string = (char *)SCM_BYTEVECTOR_CONTENTS(object);
-        }
-        else
-            // But when we're copying the contents of the string, the
-            // null termination can be enforced here.
-            arg->v_string = g_strndup((const gchar *)SCM_BYTEVECTOR_CONTENTS(object),
-                                      SCM_BYTEVECTOR_LENGTH(object));
-    }
-    else if (scm_is_string(object)) {
-        if (meta->gtype == G_TYPE_LOCALE_STRING)
-            arg->v_string = scm_to_locale_string(object);
-        else
-            arg->v_string = scm_to_utf8_string(object);
-        LATER_FREE(arg->v_string);
-    }
-    else
-        scm_wrong_type_arg_msg(subr, argpos, object, "string or bytevector");
-}
-
 
 static void
 scm_to_c_native_array(S2C_ARG_DECL)

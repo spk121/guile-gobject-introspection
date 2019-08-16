@@ -291,7 +291,7 @@ gig_type_meta_init_from_type_info(GigTypeMeta *meta, GITypeInfo *type_info)
 gchar gig_data_type_describe_buf[STRLEN];
 
 const gchar *
-gig_type_meta_describe(GigTypeMeta *meta)
+gig_type_meta_describe(const GigTypeMeta *meta)
 {
     GString *s = g_string_new(NULL);
     g_string_append_printf(s, "%s%s%s",
@@ -326,9 +326,12 @@ gig_init_data_type(void)
 
     // These 3 array types are all just aliases for GArray, but, their
     // types designate how that interacted with the GObject C FFI.
-    g_type_fixed_size_carray = g_boxed_type_register_static("fixed-size-carray", g_array_ref, g_array_unref);
-    g_type_zero_terminated_carray = g_boxed_type_register_static("zero-terminated-carray", g_array_ref, g_array_unref);
-    g_type_length_carray = g_boxed_type_register_static("length+carray", g_array_ref, g_array_unref);
+    g_type_fixed_size_carray =
+        g_boxed_type_register_static("fixed-size-carray", g_array_ref, g_array_unref);
+    g_type_zero_terminated_carray =
+        g_boxed_type_register_static("zero-terminated-carray", g_array_ref, g_array_unref);
+    g_type_length_carray =
+        g_boxed_type_register_static("length+carray", g_array_ref, g_array_unref);
 
     g_type_list = g_list_get_type();
     g_type_slist = g_slist_get_type();

@@ -269,7 +269,7 @@ gig_i_scm_set_property_x(SCM self, SCM property, SCM svalue)
     }
 
     g_value_init(&value, G_PARAM_SPEC_VALUE_TYPE(pspec));
-    gig_value_from_scm_with_error("%set-property!", &value, svalue, SCM_ARG3);
+    gig_value_from_scm_with_error(&value, svalue, "%set-property!", SCM_ARG3);
     g_object_set_property(obj, pspec->name, &value);
 
     return SCM_UNSPECIFIED;
@@ -546,11 +546,11 @@ gig_i_scm_emit(SCM self, SCM signal, SCM s_detail, SCM args)
 
     values = g_new0(GValue, query_info.n_params + 1);
     g_value_init(values, G_OBJECT_TYPE(obj));
-    gig_value_from_scm_with_error("%emit", values, self, SCM_ARG1);
+    gig_value_from_scm_with_error(values, self, "%emit", SCM_ARG1);
     SCM iter = args;
     for (guint i = 0; i < query_info.n_params; i++, iter = scm_cdr(iter)) {
         g_value_init(values + i + 1, query_info.param_types[i]);
-        gig_value_from_scm_with_error("%emit", values + i + 1, iter, SCM_ARGn);
+        gig_value_from_scm_with_error(values + i + 1, iter, "%emit", SCM_ARGn);
     }
 
     if (query_info.return_type != G_TYPE_NONE)
@@ -571,7 +571,6 @@ static SCM do_define_property(const gchar *, SCM, SCM, SCM);
 SCM
 gig_property_define(GType type, GIPropertyInfo *info, const gchar *namespace, SCM defs)
 {
-    SCM formals, specializers;
     GObjectClass *class;
     GParamSpec *prop;
     SCM s_prop, def;
