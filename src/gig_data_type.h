@@ -22,6 +22,7 @@
 G_BEGIN_DECLS
 // *INDENT-ON*
 
+extern GType g_type_void;
 extern GType g_type_unichar;
 extern GType g_type_int16;
 extern GType g_type_int32;
@@ -36,6 +37,7 @@ extern GType g_type_list;
 extern GType g_type_slist;
 extern GType g_type_callback;
 
+#define G_TYPE_VOID (g_type_void)
 #define G_TYPE_UNICHAR (g_type_unichar)
 #define G_TYPE_INT16 (g_type_int16)
 #define G_TYPE_INT32 (g_type_int32)

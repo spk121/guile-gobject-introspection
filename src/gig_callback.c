@@ -2,6 +2,7 @@
 #include <ffi.h>
 #include "gig_argument.h"
 #include "gig_callback.h"
+#include "gig_value.h"
 
 typedef struct _GigCallback GigCallback;
 struct _GigCallback
@@ -50,11 +51,9 @@ callback_binding(ffi_cif *cif, gpointer ret, gpointer *ffi_args, gpointer user_d
     for (guint i = 0; i < n_args; i++) {
         SCM s_entry = SCM_BOOL_F;
         GIArgument giarg;
+        GValue val = G_VALUE_INIT;    
 
-        // Did I need this block? Or can I just
-        // do giarg.v_pointer = ffi_args[i] for all cases?
-
-        if (cif->arg_types[i] == &ffi_type_pointer)
+        if (cif->arg_types[i] == &ffi_type_pointer) 
             giarg.v_pointer = ffi_args[i];
         else if (cif->arg_types[i] == &ffi_type_void)
             giarg.v_pointer = ffi_args[i];
@@ -90,8 +89,11 @@ callback_binding(ffi_cif *cif, gpointer ret, gpointer *ffi_args, gpointer user_d
             g_critical("Unhandled FFI type in %s: %d", __FILE__, __LINE__);
             giarg.v_pointer = ffi_args[i];
         }
-
-        gig_argument_c_to_scm("callback", i, &amap->pdata[i].meta, &giarg, &s_entry, -1);
+        gsize size = 0;
+        gig_value_preset_type(&amap->pdata[i], &val);
+        gig_arg2value(&val, &giarg, size);
+        gig_value_to_scm_full_with_error(&val, &amap->pdata[i].meta, &s_entry, "callback");
+        g_value_unset(&val);
         s_args = scm_append(scm_list_2(s_args, scm_list_1(s_entry)));
     }
 
@@ -104,7 +106,12 @@ callback_binding(ffi_cif *cif, gpointer ret, gpointer *ffi_args, gpointer user_d
     else {
         GIArgument giarg;
         gsize size;
-        gig_argument_scm_to_c("callback", 0, &amap->return_val.meta, s_ret, NULL, &giarg, &size);
+        GValue val = G_VALUE_INIT;
+        gig_value_preset_type(&amap->return_val, &val);
+        gig_scm_to_value_full_with_error(s_ret, &amap->return_val.meta, &val, "callback", -1);
+        gig_value2arg(&val, &giarg, &size);
+        g_value_unset(&val);
+
         // I'm pretty sure I don't need a big type case/switch block here.
         // I'll try brutally coercing the data, and see what happens.
         *(ffi_arg *) ret = giarg.v_uint64;

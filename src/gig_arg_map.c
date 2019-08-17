@@ -358,27 +358,6 @@ gig_amap_get_output_entry_by_c(GigArgMap *amap, gint cpos)
     g_return_val_if_reached(NULL);
 }
 
-// If this output element is an array with another output element
-// being its size, this returns TRUE and stores the index of the other
-// argument.
-gboolean
-gig_amap_output_child_c(GigArgMap *amap, gint c_output_pos, gint *cinvoke_output_array_size_index)
-{
-    g_assert_nonnull(amap);
-    g_assert_nonnull(cinvoke_output_array_size_index);
-
-    gint i = 0;
-    while (i < amap->len) {
-        if (amap->pdata[i].is_c_output && (amap->pdata[i].c_output_pos == c_output_pos)) {
-            if (amap->pdata[i].child) {
-                *cinvoke_output_array_size_index = amap->pdata[i].child->c_output_pos;
-                return TRUE;
-            }
-        }
-        i++;
-    }
-    return FALSE;
-}
 
 // Get the number of required and optional gsubr arguments for this
 // gsubr call.
@@ -445,18 +424,18 @@ gig_amap_input_s_2_output_c(const GigArgMap *amap, gint s_input_pos, gint *c_out
 // function call.  Return TRUE if this gsubr argument's array size is
 // used in the C function call.
 gboolean
-gig_amap_input_s_2_child_input_c(const GigArgMap *amap, gint s_input_pos, gint *c_input_pos)
+gig_amap_input_child_c(const GigArgMap *amap, gint c_input_pos, gint *c_child_input_pos)
 {
     g_assert_nonnull(amap);
-    g_assert_nonnull(c_input_pos);
+    g_assert_nonnull(c_child_input_pos);
 
     gint i = 0;
     while (i < amap->len) {
-        if (amap->pdata[i].is_s_input && (amap->pdata[i].s_input_pos == s_input_pos)) {
+        if (amap->pdata[i].is_c_input && (amap->pdata[i].c_input_pos == c_input_pos)) {
             GigArgMapEntry *child = amap->pdata[i].child;
             if (child) {
                 if (child->is_c_input) {
-                    *c_input_pos = child->c_input_pos;
+                    *c_child_input_pos = child->c_input_pos;
                     return TRUE;
                 }
                 else
@@ -470,19 +449,22 @@ gig_amap_input_s_2_child_input_c(const GigArgMap *amap, gint s_input_pos, gint *
     g_return_val_if_reached(FALSE);
 }
 
+// If this output element is an array with another output element
+// being its size, this returns TRUE and stores the index of the other
+// argument.
 gboolean
-gig_amap_input_s_2_child_output_c(const GigArgMap *amap, gint s_input_pos, gint *c_output_pos)
+gig_amap_output_child_c(const GigArgMap *amap, gint c_output_pos, gint *c_child_output_pos)
 {
     g_assert_nonnull(amap);
-    g_assert_nonnull(c_output_pos);
+    g_assert_nonnull(c_child_output_pos);
 
     gint i = 0;
     while (i < amap->len) {
-        if (amap->pdata[i].is_s_input && (amap->pdata[i].s_input_pos == s_input_pos)) {
+        if (amap->pdata[i].is_c_output && (amap->pdata[i].c_output_pos == c_output_pos)) {
             GigArgMapEntry *child = amap->pdata[i].child;
             if (child) {
                 if (child->is_c_output) {
-                    *c_output_pos = child->c_output_pos;
+                    *c_child_output_pos = child->c_output_pos;
                     return TRUE;
                 }
                 else

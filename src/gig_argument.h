@@ -9,23 +9,18 @@
 G_BEGIN_DECLS
 // *INDENT-ON*
 
-#define GIG_ARRAY_SIZE_UNKNOWN ((gsize)-1)
+// Given VAL, a GValue whos type has already been initialized
+// and whose boxed containers, such as GArrays, have already been initialized,
+// set ARG.
+void gig_arg2value(GValue *val, GIArgument *arg, gsize array_len);
 
-#define S2C_ARG_DECL const gchar *subr, gint argpos,    \
-        GigTypeMeta *meta, SCM object,               \
-        GPtrArray *must_free, GIArgument *arg, gsize *size
-#define S2C_ARGS subr, argpos, meta, object, must_free, arg, size
+// Given VAL, a GValue whose type has already been initialized
+// and whose boxed containers, such as GArray, have already been initialized,
+// returns a GIArgument containing the contents of VAL.  Also setting
+// *array_len, when necessary.
+void gig_value2arg(GValue *val, GIArgument *arg, gsize *array_len);
 
-#define C2S_ARG_DECL const gchar *subr, gint argpos,    \
-        GigTypeMeta *meta, GIArgument *arg,             \
-        SCM *object, gsize size
-#define C2S_ARGS subr, argpos, meta, arg, object, size
-
-void gig_argument_scm_to_c(S2C_ARG_DECL);
-void gig_argument_c_to_scm(C2S_ARG_DECL);
-char *gig_argument_describe_arg(GIArgInfo *arg_info);
-char *gig_argument_describe_return(GITypeInfo *type_info, GITransfer transfer, gboolean null_ok,
-                                   gboolean skip);
+gsize zero_terminated_carray_length(GigTypeMeta *meta, gpointer array);
 
 void gig_init_argument(void);
 

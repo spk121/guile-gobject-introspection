@@ -14,9 +14,11 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <glib-object.h>
+#include <glib.h>
 #include "gig_data_type.h"
 #include "gig_util.h"
 
+GType g_type_void;
 GType g_type_unichar;
 GType g_type_int16;
 GType g_type_int32;
@@ -65,8 +67,10 @@ gig_type_meta_init_from_callable_info(GigTypeMeta *meta, GICallableInfo *ci)
 
     gig_type_meta_init_from_type_info(meta, type_info);
 
+    g_assert(meta->gtype != G_TYPE_INVALID);
+
     meta->is_in = FALSE;
-    if (meta->gtype != G_TYPE_NONE && meta->gtype != G_TYPE_INVALID)
+    if (meta->gtype != G_TYPE_VOID)
         meta->is_out = TRUE;
     else
         meta->is_out = FALSE;
@@ -155,7 +159,7 @@ gig_type_meta_init_from_type_info(GigTypeMeta *meta, GITypeInfo *type_info)
             meta->item_size = sizeof(gpointer);
         }
         else {
-            meta->gtype = G_TYPE_NONE;
+            meta->gtype = G_TYPE_VOID;
             meta->item_size = 0;
         }
     }
@@ -178,7 +182,7 @@ gig_type_meta_init_from_type_info(GigTypeMeta *meta, GITypeInfo *type_info)
                 meta->gtype = G_TYPE_ZERO_TERMINATED_CARRAY;
             }
             else {
-                g_warning("unsized C array");
+                g_debug("encountered a C array with size info: treating like a pointer");
                 meta->gtype = G_TYPE_POINTER;
             }
         }
@@ -313,9 +317,65 @@ gig_type_meta_describe(const GigTypeMeta *meta)
 G_DEFINE_BOXED_TYPE(GList, g_list, g_list_copy, g_list_free);
 G_DEFINE_BOXED_TYPE(GSList, g_slist, g_slist_copy, g_slist_free);
 
+static void
+void_init(GValue *value)
+{
+    value->data[0].v_int = 0;
+}
+
+static void
+void_copy(const GValue *src_value, GValue *dest_value)
+{
+    dest_value->data[0].v_int = src_value->data[0].v_int;
+}
+
+static gchar *
+void_collect(GValue *value,
+             guint n_collect_values, GTypeCValue * collect_values, guint collect_flags)
+{
+    return NULL;
+}
+
+static gchar *
+void_lcopy(const GValue *value,
+           guint n_collect_values, GTypeCValue * collect_values, guint collect_flags)
+{
+    return NULL;
+}
+
+static GType
+define_void_type(void)
+{
+    // This is a fundamental type for a GValue that holds a 'void'
+    // return value.  A fundamental type is used so that it is disjoint
+    // from all other categories.  But to make a GType fundamental type
+    // that allows one to g_value_init(), it needs all of this unused infrastructure.
+
+    static GTypeValueTable vtable =
+        { void_init, NULL, void_copy, NULL, "i", void_collect, "p", void_lcopy };
+    static GTypeInfo info = {
+        0,                      /* class_size */
+        NULL,                   /* base_init */
+        NULL,                   /* base_destroy */
+        NULL,                   /* class_init */
+        NULL,                   /* class_destroy */
+        NULL,                   /* class_data */
+        0,                      /* instance_size */
+        0,                      /* n_preallocs */
+        NULL,                   /* instance_init */
+        &vtable,                /* value_table */
+    };
+    const GTypeFundamentalInfo finfo = { 0 };
+    GType type_void = g_type_fundamental_next();
+    g_type_register_fundamental(type_void, g_intern_static_string("_void"), &info, &finfo, 0);
+    return type_void;
+}
+
 void
 gig_init_data_type(void)
 {
+    g_type_void = define_void_type();
+
     g_type_unichar = g_type_register_static_simple(G_TYPE_INT, "gunichar", 0, NULL, 0, NULL, 0);
     g_type_int16 = g_type_register_static_simple(G_TYPE_INT, "gint16", 0, NULL, 0, NULL, 0);
     g_type_int32 = g_type_register_static_simple(G_TYPE_INT, "gint32", 0, NULL, 0, NULL, 0);
@@ -323,6 +383,12 @@ gig_init_data_type(void)
     g_type_uint32 = g_type_register_static_simple(G_TYPE_UINT, "guint32", 0, NULL, 0, NULL, 0);
     g_type_locale_string = g_type_register_static_simple(G_TYPE_STRING,
                                                          "locale-string", 0, NULL, 0, NULL, 0);
+
+    GType
+        g_type_register_fundamental(GType type_id,
+                                    const gchar *type_name,
+                                    const GTypeInfo * info,
+                                    const GTypeFundamentalInfo * finfo, GTypeFlags flags);
 
     // These 3 array types are all just aliases for GArray, but, their
     // types designate how that interacted with the GObject C FFI.
