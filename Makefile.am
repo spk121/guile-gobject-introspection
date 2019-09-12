@@ -577,6 +577,7 @@ EVERYTHING_TESTS = \
   test/everything/array-uint64-in.scm \
   test/everything/array-unichar-in.scm \
   test/everything/array-bool-in.scm \
+  test/everything/multi-array-key-value-in.scm \
   test/everything/array-enum-in.scm \
   test/everything/array-in-guint64-len.scm \
   test/everything/array-in-guint8-len.scm \

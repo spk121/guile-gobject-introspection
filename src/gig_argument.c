@@ -540,7 +540,7 @@ scm_to_c_native_array(S2C_ARG_DECL)
         scm_to_c_native_immediate_array(S2C_ARGS);
     else if (item_type == G_TYPE_STRING)
         scm_to_c_native_string_array(S2C_ARGS);
-    else if (item_type == G_TYPE_VARIANT
+    else if (fundamental_item_type == G_TYPE_BOXED || item_type == G_TYPE_VARIANT
              || fundamental_item_type == G_TYPE_ENUM || fundamental_item_type == G_TYPE_FLAGS)
         scm_to_c_native_interface_array(S2C_ARGS);
     else
@@ -677,14 +677,14 @@ scm_to_c_native_interface_array(S2C_ARG_DECL)
 #define FUNC_NAME "%object->c-native-interface-array-arg"
     GType item_type = meta->params[0].gtype;
     GType fundamental_item_type = G_TYPE_FUNDAMENTAL(item_type);
-    if (fundamental_item_type == G_TYPE_OBJECT
+    if (fundamental_item_type == G_TYPE_OBJECT || fundamental_item_type == G_TYPE_BOXED
         || fundamental_item_type == G_TYPE_INTERFACE || fundamental_item_type == G_TYPE_VARIANT) {
         // If we are a Struct or Object, we need to look up
         // our actual GType.
         if (!scm_is_vector(object))
             scm_wrong_type_arg_msg(subr, argpos, object, "vector of objects");
         *size = scm_c_vector_length(object);
-        if (meta->is_ptr) {
+        if (meta->params[0].is_ptr) {
             if (meta->is_zero_terminated) {
                 arg->v_pointer = malloc(sizeof(gpointer) * (*size + 1));
                 ((gpointer *)arg->v_pointer)[*size] = 0;
@@ -710,20 +710,19 @@ scm_to_c_native_interface_array(S2C_ARG_DECL)
             }
         }
         else {
+            GigTypeMeta *item_meta = &meta->params[0];
+            gsize real_item_size = gig_meta_real_item_size(item_meta);
             if (meta->is_zero_terminated)
-                arg->v_pointer = g_malloc0(gig_meta_real_item_size(meta) * (*size + 1));
+                arg->v_pointer = g_malloc0(real_item_size * (*size + 1));
             else
-                arg->v_pointer = malloc(sizeof(gpointer) * *size);
+                arg->v_pointer = malloc(real_item_size * *size);
             for (gsize i = 0; i < *size; i++) {
                 gpointer p = gig_type_peek_object(scm_c_vector_ref(object, i));
                 if (meta->transfer == GI_TRANSFER_EVERYTHING)
-                    memcpy((char *)(arg->v_pointer) + i * gig_meta_real_item_size(meta),
-                           g_memdup(p, gig_meta_real_item_size(meta)),
-                           gig_meta_real_item_size(meta));
+                    memcpy((char *)(arg->v_pointer) + i * real_item_size,
+                           g_memdup(p, real_item_size), real_item_size);
                 else
-                    memcpy((char *)(arg->v_pointer) + i * gig_meta_real_item_size(meta), p,
-                           gig_meta_real_item_size(meta));
-
+                    memcpy((char *)(arg->v_pointer) + i * real_item_size, p, real_item_size);
             }
         }
     }
