@@ -61,6 +61,7 @@ static void scm_to_c_native_string_array(S2C_ARG_DECL);
 static void scm_to_c_native_interface_array(S2C_ARG_DECL);
 static void scm_to_c_garray(S2C_ARG_DECL);
 static void scm_to_c_byte_array(S2C_ARG_DECL);
+static void scm_to_c_ptr_array(S2C_ARG_DECL);
 
 // Fundamental types
 static void c_interface_to_scm(C2S_ARG_DECL);
@@ -497,6 +498,8 @@ scm_to_c_boxed(S2C_ARG_DECL)
         scm_to_c_garray(S2C_ARGS);
     else if (t == G_TYPE_BYTE_ARRAY)
         scm_to_c_byte_array(S2C_ARGS);
+    else if (t == G_TYPE_PTR_ARRAY)
+        scm_to_c_ptr_array(S2C_ARGS);
     else
         arg->v_pointer = gig_type_peek_object(object);
 }
@@ -653,6 +656,31 @@ scm_to_c_byte_array(S2C_ARG_DECL)
 }
 
 static void
+scm_to_c_ptr_array(S2C_ARG_DECL)
+{
+    TRACE_S2C();
+    GIArgument _arg;
+    GigTypeMeta _meta = *meta;
+
+    _meta.is_raw_array = TRUE;
+
+    // Make a C array from this SCM.
+    gig_argument_scm_to_c(subr, argpos, &_meta, object, NULL, &_arg, size);
+
+    // Move the pointers inside of the C array into a GPtrArray.
+    GPtrArray *ptrarray = g_ptr_array_new();
+    for (int i = 0; i < *size; i++)
+        g_ptr_array_add(ptrarray, ((gpointer *)(_arg.v_pointer))[i]);
+    arg->v_pointer = ptrarray;
+    g_assert_nonnull(arg->v_pointer);
+
+    // Free the C array without clobbering the pointers it used to
+    // contain.
+    free(_arg.v_pointer);
+}
+
+
+static void
 scm_to_c_garray(S2C_ARG_DECL)
 {
     TRACE_S2C();
@@ -762,8 +790,6 @@ scm_to_c_native_interface_array(S2C_ARG_DECL)
     }
 #undef FUNC_NAME
 }
-
-
 
 static void
 scm_to_c_native_string_array(S2C_ARG_DECL)
@@ -1310,11 +1336,17 @@ c_gptrarray_to_scm(C2S_ARG_DECL)
     GigTypeMeta _meta = *meta;
     GIArgument _arg;
     GPtrArray *array = arg->v_pointer;
-    _arg.v_pointer = array->pdata;
     _meta.is_raw_array = TRUE;
     _meta.length = array->len;
+
+    // Transfer the contents out of the GPtrArray into a
+    // native C array, and then on to an SCM
     size = array->len;
+    _arg.v_pointer = g_memdup(array->pdata, array->len * sizeof(gpointer));
     c_native_array_to_scm(subr, argpos, &_meta, &_arg, object, size);
+
+    // Free the GPtrArray without deleting the contents
+    g_ptr_array_free(arg->v_pointer, FALSE);
 }
 
 static void

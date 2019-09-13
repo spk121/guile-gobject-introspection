@@ -617,6 +617,10 @@ EVERYTHING_TESTS = \
   test/everything/gptrarray-utf8-none-return.scm \
   test/everything/gptrarray-utf8-container-return.scm \
   test/everything/gptrarray-utf8-full-return.scm \
+  test/everything/gptrarray-utf8-none-in.scm \
+  test/everything/gptrarray-utf8-none-out.scm \
+  test/everything/gptrarray-utf8-container-out.scm \
+  test/everything/gptrarray-utf8-full-out.scm \
   test/everything/gslist-int-none-return.scm \
   test/everything/gslist-utf8-none-return.scm \
   test/everything/gslist-utf8-container-return.scm \
