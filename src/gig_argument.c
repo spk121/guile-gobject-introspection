@@ -698,7 +698,10 @@ scm_to_c_native_interface_array(S2C_ARG_DECL)
                     if (fundamental_item_type == G_TYPE_BOXED) {
                         ((gpointer *)(arg->v_pointer))[i] =
                             g_memdup(p, gig_meta_real_item_size(&meta->params[0]));
-                        // ((gpointer *)(arg->v_pointer))[i] = p;
+                    }
+                    else if (fundamental_item_type == G_TYPE_VARIANT) {
+                        ((gpointer *)(arg->v_pointer))[i] = p;
+                        g_variant_ref(p);
                     }
                     else {
                         ((gpointer *)(arg->v_pointer))[i] = p;

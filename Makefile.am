@@ -596,6 +596,7 @@ EVERYTHING_TESTS = \
   test/everything/array-zero-terminated-inout.scm \
   test/everything/array-gvariant-none-in.scm \
   test/everything/array-gvariant-container-in.scm \
+  test/everything/array-gvariant-full-in.scm \
   test/everything/garray-int-none-return.scm \
   test/everything/garray-uint64-none-return.scm \
   test/everything/garray-utf8-none-return.scm \
