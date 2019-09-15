@@ -621,6 +621,13 @@ EVERYTHING_TESTS = \
   test/everything/gptrarray-utf8-none-out.scm \
   test/everything/gptrarray-utf8-container-out.scm \
   test/everything/gptrarray-utf8-full-out.scm \
+  test/everything/gptrarray-utf8-none-inout.scm \
+  test/everything/gptrarray-utf8-container-inout.scm \
+  test/everything/gptrarray-utf8-full-inout.scm \
+  test/everything/bytearray-full-return.scm \
+  test/everything/bytearray-none-in.scm \
+  test/everything/gbytes-full-return.scm \
+  test/everything/gbytes-none-in.scm \
   test/everything/gslist-int-none-return.scm \
   test/everything/gslist-utf8-none-return.scm \
   test/everything/gslist-utf8-container-return.scm \
