@@ -481,7 +481,7 @@ scm_to_c_pointer(S2C_ARG_DECL)
     else if (scm_is_bytevector(object))
         arg->v_pointer = SCM_BYTEVECTOR_CONTENTS(object);
     else
-        UNHANDLED;
+        scm_wrong_type_arg_msg(subr, argpos, object, "a pointer");
 }
 
 static void

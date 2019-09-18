@@ -75,6 +75,7 @@ Reference Guide
 * GObject Properties::
 * Custom GObjects::              Defining new GObject classes
 * Enums and Flags::
+* Handling GHashTables::
 * Utilities::
 * More Stuff::
 
@@ -440,6 +441,7 @@ their @file{.typelib} files.
 * GObject Properties::
 * Custom GObjects::              Defining new GObject classes
 * Enums and Flags::
+* Handling GHashTables::
 * Utilities::
 * More Stuff::
 @end menu
@@ -1035,6 +1037,67 @@ set with respect to @code{(flags-mask class)}.
 
 @code{flags-projection} is an alias for @code{flags-projection/list}.
 @end deffn
+
+@c ----------------------------------------------------------------
+@node Handling GHashTables
+@section Handling GHashTables
+Some GObject libraries use GLib's @code{GHashTable} types as parameters.
+The @code{GHashTable} type take C pointers for both keys and values, and
+as such is awkward to work with from Scheme.  Here are a few procedures
+to make working with @code{GHashTable} instance possible.
+
+@deffn Procedure make-ghashtable key-type
+This procedure creates a new @code{<GHashTable>}.  All instances of
+@code{<GHashTable>} will use a pointer as its key type.  @var{key-type}
+is a symbol -- one of @code{direct}, @code{int}, @code{int64},
+@code{double}, or @code{str} -- that indicates the how the key pointer
+will be interpreted when testing for equality.
+@end deffn
+
+@table @code
+@item direct
+The hash table will be sorted by pointer address, but, the pointer address
+is interpreted as a signed integer.
+@item int
+The key pointer is assumed to be a pointer to an integer, and the hash table
+is keyed by those integers.
+@item int64
+The key pointer is assumed to be a pointer to a 64-bit signed integer.
+@item double
+The key pointer is assumed to be a pointer to a double.
+@item str
+The key pointer is a pointer to a UTF-8 encoded, NULL-terminated string.
+@end table
+
+@deffn Procedure make-signed-pointer int
+@deffnx Procedure signed-pointer-address ptr
+@code{make-signed-pointer} takes an integer and returns a pointer with
+that integer as an address.  The integer is assumed to be signed, and is
+cast to its unsigned, two-complement representation before making the
+pointer.
+
+@code{signed-pointer-address} returns, as a signed integer, the address to
+which a pointer points.
+
+These procedure can be used to pack and unpack the keys of @code{direct}
+@code{<GHashTable>} instances.
+@end deffn
+
+@deffn Procedure int->pointer x
+@deffnx Procedure int64->pointer x
+@deffnx Procedure double->pointer x
+These procedures allocate a memory location to store a single integer, 64-bit
+integer, or real number, and then returns a pointer to that memory location.
+@end deffn
+
+@deffn Procedure pointer->int ptr
+@deffnx Procedure pointer->int64 ptr
+@deffnx Procedure pointer->double ptr
+These procedures interpret the pointer as pointing to a memory location
+that contains a single integer, 64-bit integer, or real number, and then
+returns the value at that location.
+@end deffn
+
 
 @c ----------------------------------------------------------------
 @node Utilities

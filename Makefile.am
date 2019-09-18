@@ -95,41 +95,43 @@ examples/resources/test.gresource: AM_GRESOURCE_FLAGS = --sourcedir=$(abs_srcdir
 guileextension_LTLIBRARIES = libguile-gi.la
 
 libguile_gi_la_c_sources = \
-  src/gig_argument.c \
-  src/gig_closure.c \
-  src/gig_data_type.c \
-  src/gig_object.c \
-  src/gig_value.c \
-  src/gig_signal.c \
   src/gig.c \
   src/gig_arg_map.c \
+  src/gig_argument.c \
   src/gig_callback.c \
-  src/gig_function.c \
+  src/gig_closure.c \
   src/gig_constant.c \
-  src/gig_flag.c \
-  src/gig_repository.c \
+  src/gig_data_type.c \
   src/gig_document.c \
+  src/gig_flag.c \
+  src/gig_function.c \
+  src/gig_hash.c \
+  src/gig_object.c \
+  src/gig_repository.c \
+  src/gig_signal.c \
   src/gig_type.c \
   src/gig_type_private.c \
-  src/gig_util.c
+  src/gig_util.c \
+  src/gig_value.c
 
 libguile_gi_la_internal_headers = \
-  src/gig_argument.h \
-  src/gig_closure.h \
-  src/gig_data_type.h \
-  src/gig_object.h \
-  src/gig_value.h \
-  src/gig_signal.h \
   src/gig_arg_map.h \
+  src/gig_argument.h \
   src/gig_callback.h \
+  src/gig_closure.h \
+  src/gig_constant.h \
+  src/gig_data_type.h \
+  src/gig_flag.h \
   src/gig_function.h \
   src/gig_function_private.h \
-  src/gig_constant.h \
-  src/gig_flag.h \
+  src/gig_hash.h \
+  src/gig_object.h \
   src/gig_repository.h \
+  src/gig_signal.h \
   src/gig_type.h \
   src/gig_type_private.h \
-  src/gig_util.h
+  src/gig_util.h \
+  src/gig_value.h
 
 libguile_gi_la_SOURCES = \
   $(libguile_gi_la_internal_headers) \

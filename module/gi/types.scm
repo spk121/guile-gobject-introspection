@@ -18,6 +18,7 @@
   #:use-module (srfi srfi-1)
   #:use-module (srfi srfi-2)
   #:use-module (srfi srfi-26)
+  #:use-module (rnrs bytevectors)
   #:use-module (system foreign)
 
   #:use-module (gi oop)
@@ -32,7 +33,12 @@
             enum-universe
             flags-mask flags-union flags-intersection flags-difference
             flags-complement flags-projection flags-projection/list
-            flags-projection/number))
+            flags-projection/number
+            make-ghashtable
+            make-signed-pointer signed-pointer-address
+            int->pointer pointer->int
+            int64->pointer pointer->int64
+            double->pointer pointer->double))
 
 (eval-when (expand load eval)
   ;; This module is loaded before most others and indeed most of the library
@@ -43,7 +49,8 @@
   (load-extension "libguile-gi" "gig_init_logging")
   (load-extension "libguile-gi" "gig_init_types")
   (load-extension "libguile-gi" "gig_init_value")
-  (load-extension "libguile-gi" "gig_init_closure"))
+  (load-extension "libguile-gi" "gig_init_closure")
+  (load-extension "libguile-gi" "gig_init_hash"))
 
 ;;; Values and Params
 
@@ -314,3 +321,68 @@
 (define-method (equal? (flags1 <GFlags>) (flags2 <GFlags>))
   (and (equal? (class-of flags1) (class-of flags2))
        (= flags1 flags2)))
+
+(define INTMAX (expt 2 (1- (* 8 (sizeof '*)))))
+(define UINTMAX (1- (expt 2 (* 8 (sizeof '*)))))
+
+(define (make-signed-pointer i)
+  "Interpret a signed integer as a memory address, and return a
+pointer to that address"
+  (make-pointer
+   (logand i UINTMAX)))
+
+(define (signed-pointer-address p)
+  "Return the address of a pointer as a signed integer."
+  (if p
+      (let ((i (pointer-address p)))
+        (if (<= i INTMAX)
+            i
+            (- (1+ (logxor UINTMAX i)))))
+      ;; else assume #f is null-pointer
+      0))
+
+(define (int->pointer x)
+  "Store a native-sized integer in a newly allocated location and
+return a pointer to that location."
+  (let ((bv (make-bytevector (sizeof int))))
+    (bytevector-sint-set! bv 0 x (native-endianness) (sizeof int))
+    (bytevector->pointer bv)))
+
+(define (pointer->int p)
+  "Interpreting a pointer as a memory location in which a native-sized
+integer is stored, return that integer."
+  (let ((bv (pointer->bytevector p (sizeof int))))
+    (bytevector-sint-ref bv 0 (native-endianness) (sizeof int))))
+
+(define (int64->pointer x)
+  "Store a 64-bit integer in a newly allocated location and
+return a pointer to that location."
+  (let ((bv (make-bytevector (sizeof int64))))
+    (bytevector-s64-set! bv 0 x (native-endianness))
+    (bytevector->pointer bv)))
+
+(define (pointer->int64 p)
+  "Interpreting a pointer as a memory location in which a 64-bit
+integer is stored, return that integer."
+  (let ((bv (pointer->bytevector p (sizeof int64))))
+    (bytevector-s64-ref bv 0 (native-endianness))))
+
+(define (double->pointer x)
+  "Store a double-precision float in a newly allocated location and
+return a pointer to that location."
+  (let ((bv (make-bytevector (sizeof double))))
+    (bytevector-ieee-double-set! bv 0 x (native-endianness))
+    (bytevector->pointer bv)))
+
+(define (pointer->double p)
+  "Interpreting a pointer as a memory location in which a
+double-precision float is stored, return that double."
+  (let ((bv (pointer->bytevector p (sizeof double))))
+    (bytevector-ieee-double-ref bv 0 (native-endianness))))
+
+(when (defined? 'make-ghashtable)
+  (set-procedure-property! make-ghashtable 'documentation
+"Creates a new <GHashTable>, which will use a pointer as its key type.
+The KEY-TYPE a symbol -- one of 'direct, 'int, 'int64, 'double, or
+'str -- that indicates the how the key pointer will be interpreted."))
+
